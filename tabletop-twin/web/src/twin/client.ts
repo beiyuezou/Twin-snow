@@ -138,6 +138,24 @@ export interface Verdict {
 }
 
 /**
+ * What the table shows while it waits for a hand: enough to say what would move,
+ * where it would go, and which rule stopped it. Filled from a verdict when this
+ * browser proposed the action, and from an open payment record when the twin did.
+ */
+export interface Held {
+  action_id: string;
+  verb: string;
+  recipient: string;
+  country: string;
+  currency: string;
+  amount_dollars: number;
+  rail: string;
+  fee_dollars: number;
+  rule: string;
+  reason: string;
+}
+
+/**
  * One model endpoint, described from the environment alone — no request was made
  * to produce this. `supplied_by` names the variables the operator set and
  * `assumed` the fields that fell back to a published default, which is how a table
@@ -354,5 +372,12 @@ export const twinApi = {
   propose: (calls: unknown[]) => post<{ results: Record<string, unknown>[]; scene: ScenePayload }>('/v1/tools', { calls }),
   approve: (action_id: string, gesture: string) =>
     post<{ action_id: string; state: string; error?: string }>('/v1/approve', { action_id, gesture }),
+  /** Closing the panel is not a decision. This is the one that says no in the ledger. */
+  reject: (action_id: string) =>
+    post<{ action_id: string; state: string }>('/v1/reject', {
+      action_id,
+      reviewer: 'the hand at the table',
+      reason: 'refused from the panel',
+    }),
   reconcile: (action_id: string) => post<{ action_id: string; state: string }>('/v1/reconcile', { action_id }),
 };

@@ -7,14 +7,19 @@
  */
 
 import { session, twinApi } from './client.js';
-import type { Caption, Fork, ScenePayload, Verdict } from './client.js';
+import type { Caption, Fork, Held, ScenePayload, Verdict } from './client.js';
 
 type Listener = () => void;
 
+/** The states the payment machine leaves open for a hand to settle. */
+const AWAITING_A_PINCH = new Set(['draft', 'proposed']);
+
 class TwinController {
   payload: ScenePayload | null = null;
-  /** The action the policy engine put on hold for a hand gesture. */
-  pending: Verdict | null = null;
+  /** The action being held for a hand gesture, by this browser or by the twin itself. */
+  pending: Held | null = null;
+  /** Set between the pinch and the twin's answer, so the table can say "asking". */
+  settling: string | null = null;
   captions: Caption[] = [];
   offline = false;
   route = '';
@@ -38,9 +43,33 @@ class TwinController {
     if (scene) {
       this.payload = scene;
       this.chaseUnknown(scene);
+      this.holdForPinch(scene);
     }
     this.offline = false;
     this.emit();
+  }
+
+  /**
+   * A payment the machine never finished is a decision waiting for a hand, whether
+   * this browser asked for it or the twin did. Nothing is invented here: the rule
+   * line says which state the record is in, because that is all the record says.
+   */
+  private holdForPinch(scene: ScenePayload): void {
+    if (this.pending || this.settling) return;
+    const held = scene.payments.find((payment) => AWAITING_A_PINCH.has(payment.state));
+    if (!held) return;
+    this.pending = {
+      action_id: held.action_id,
+      verb: '',
+      recipient: held.recipient,
+      country: held.country,
+      currency: held.currency,
+      amount_dollars: held.amount_dollars,
+      rail: held.rail,
+      fee_dollars: held.fee_dollars,
+      rule: `payment state: ${held.state}`,
+      reason: '',
+    };
   }
 
   /**
@@ -106,6 +135,8 @@ class TwinController {
     session.set(null);
     this.account = '';
     this.payload = null;
+    this.pending = null;
+    this.settling = null;
     this.captions = [];
     this.emit();
   }
@@ -164,19 +195,32 @@ class TwinController {
       null,
     );
     if (!result) return null;
-    this.adopt(result.scene);
     const first = result.results[0] as unknown as Verdict | undefined;
-    this.pending = first && first.verdict === 'require_approval' ? first : null;
+    if (first?.verdict === 'require_approval') this.pending = heldFrom(first);
+    this.adopt(result.scene);
     if (first) this.say('policy', first.reason, first.action_id);
     return first ?? null;
   }
 
   async approve(actionId: string, gesture: string): Promise<string | null> {
+    this.settling = actionId;
+    this.emit();
     const result = await this.call(() => twinApi.approve(actionId, gesture), null);
     this.pending = null;
+    await this.refresh();
+    this.settling = null;
     if (!result) return null;
     this.say('approval', `Settled as ${result.state}.`, actionId);
+    return result.state;
+  }
+
+  /** A no said from the panel is a decision the twin writes down, not a panel closing. */
+  async reject(actionId: string): Promise<string | null> {
+    const result = await this.call(() => twinApi.reject(actionId), null);
+    this.pending = null;
+    if (!result) return null;
     await this.refresh();
+    this.say('reject', `Refused. That record now reads ${result.state}.`, actionId);
     return result.state;
   }
 
@@ -260,6 +304,12 @@ function signedInFromUrl(): { email: string; password: string } | null {
 function dollars(value: number): string {
   const sign = value < 0 ? 'minus' : 'plus';
   return `${sign} $${Math.abs(value).toFixed(2)}`;
+}
+
+/** The verdict the twin just gave, in the shape the panel holds. */
+function heldFrom(verdict: Verdict): Held {
+  const { action_id, verb, recipient, country, currency, amount_dollars, rail, fee_dollars, rule, reason } = verdict;
+  return { action_id, verb, recipient, country, currency, amount_dollars, rail, fee_dollars, rule, reason };
 }
 
 export const twin = new TwinController();

@@ -1,52 +1,103 @@
-<div class="card">
+<div id="ApproveCard" class="card">
   <style>
     .card {
       display: flex;
       flex-direction: column;
-      width: 44;
-      padding: 3.4;
-      gap: 2.2;
+      width: 58;
+      padding: 3.6;
+      gap: 1.8;
       background-color: #10151c;
       border-color: #ffd166;
       border-width: 0.8;
-      border-radius: 2.2;
+      border-radius: 2.6;
     }
-    .title {
-      font-size: 2.1;
-      font-weight: 700;
-      color: #ffd166;
-    }
-    .body {
-      font-size: 2.4;
-      color: #f2e8c9;
-    }
-    .hint {
-      font-size: 1.7;
-      color: #8fa1b3;
-    }
-    .row {
+    .band {
       display: flex;
       flex-direction: row;
+      align-items: center;
       justify-content: space-between;
-    }
-    .reject {
-      font-size: 1.9;
-      color: #f2e8c9;
-      background-color: #1f2a36;
-      border-color: #4a5f74;
-      border-width: 0.5;
-      border-radius: 1.4;
-      padding-top: 1.2;
-      padding-bottom: 1.2;
+      padding-top: 1.6;
+      padding-bottom: 1.6;
       padding-left: 2.2;
       padding-right: 2.2;
+      background-color: #2b2412;
+      border-radius: 1.8;
+    }
+    .chip {
+      font-size: 2.2;
+      font-weight: 700;
+      color: #0e1116;
+      background-color: #ffd166;
+      padding-top: 0.8;
+      padding-bottom: 0.8;
+      padding-left: 1.8;
+      padding-right: 1.8;
+      border-radius: 1.1;
+    }
+    .held {
+      font-size: 2;
+      color: #f2e8c9;
+    }
+    .eyebrow {
+      font-size: 2;
+      font-weight: 700;
+      color: #9aa5b1;
+    }
+    .hero {
+      font-size: 5.4;
+      font-weight: 700;
+      line-height: 1.1;
+      color: #ffd166;
+      text-align: left;
+    }
+    .to {
+      font-size: 3;
+      line-height: 1.25;
+      color: #f2e8c9;
+      text-align: left;
+    }
+    .why {
+      font-size: 2.4;
+      line-height: 1.3;
+      color: #9aa5b1;
+      text-align: left;
+    }
+    .rule {
+      font-size: 2.2;
+      line-height: 1.3;
+      color: #7fb3d5;
+      text-align: left;
+    }
+    .hint {
+      font-size: 2.2;
+      line-height: 1.3;
+      color: #f2e8c9;
+      text-align: left;
+    }
+    .reject {
+      font-size: 2.4;
+      font-weight: 600;
+      color: #f2e8c9;
+      background-color: #1a222c;
+      border-color: #4a5f74;
+      border-width: 0.6;
+      border-radius: 1.6;
+      padding-top: 1.8;
+      padding-bottom: 1.8;
+      padding-left: 3.2;
+      padding-right: 3.2;
       cursor: pointer;
     }
   </style>
-  <span class="title">Holding for your pinch</span>
-  <span id="ApproveText" class="body">Nothing is waiting.</span>
-  <span class="hint">Hold the coin one second, or tap reject.</span>
-  <div class="row">
-    <button id="Btn-reject" class="reject">Reject</button>
-  </div>
+  <span id="ApproveBand" class="band">
+    <span id="ApproveState" class="chip">waiting</span>
+    <span id="ApproveHeld" class="held">nothing armed yet</span>
+  </span>
+  <span id="ApproveAmount" class="hero">USD 0.00</span>
+  <span class="eyebrow">AND IT WOULD GO TO</span>
+  <span id="ApproveTo" class="to">nobody yet</span>
+  <span id="ApproveWhy" class="why">The policy engine has not named a reason.</span>
+  <span id="ApproveRule" class="rule">rule: none</span>
+  <span class="hint">Only a one-second hold on the coin settles it. This button says no.</span>
+  <button id="Btn-reject" class="reject">Reject</button>
 </div>

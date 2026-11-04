@@ -128,9 +128,15 @@ it was.
 ## Accessibility
 
 Every spoken line is also a caption. Every gesture has a voice and a gaze
-alternative, and the panels are reachable by ray as well as by hand. The palette is
+alternative, and the panels are reachable by ray as well as by hand — except the one
+hold that moves money, which stays a hold on purpose and refuses a click. The palette is
 colourblind-safe and never the only channel: probability is carried by fog density
-*and* size, risk by height *and* position relative to the table.
+*and* size, risk by height *and* position relative to the table. The same rule holds
+on the panels. A card changes its whole surface when its state changes — band, chip
+and border together — and the chip carries the word for that state, so a person who
+cannot tell the amber from the red still reads "your hold" or "offline". Nothing on
+a panel is a colour alone, and the decision card names the decision it is asking for
+and what the money would do.
 
 ## Scope
 
@@ -204,6 +210,36 @@ gateway rather than a paid endpoint: the caption arrived in two pieces about a s
 apart and the answer the world kept was the whole verified sentence, with the route
 reported as the model that produced it.
 
+The four panels a person reads were then rebuilt and driven the same way: the caption
+card, the card that asks for a decision, the panel listing money that has left the
+table, and the plate above the time wheel. Each is now a layout rather than a stack of
+lines — a state band, a byline that keeps route, account and day apart instead of
+squeezing them into one row, one caption at a size meant to be read at arm's length, and
+a two-by-two grid of asks where four buttons used to wrap over each other. Each of the
+five states moves the band, the chip and the card border at once, and the chip carries
+the word for the state, so amber and blue are never the only difference.
+
+That run put a real decision through them. A payment above the approval floor was
+proposed over HTTP and the client's own heartbeat surfaced it on the decision card with
+the amount, the recipient, the rail, the fee and the rule that stopped it, while the
+money panel showed the same row. A pointer press on the card's reject button then sent
+the refusal to the service: the request answered 200, the ledger kept it as a rejection
+naming who refused and why, the record left the money panel, and the caption card
+changed its whole surface to say that the record now reads cancelled. Nothing reached
+the console and no request failed.
+
+Closing that card is not the same as deciding, which is why the button writes to the
+ledger rather than hiding the panel: a refusal that only moves pixels leaves no trace
+for the person who has to explain the payment later.
+
+The other half of that decision was checked rather than assumed. A button was put on the
+card to settle a payment with a click, and the machine refused it — the ledger kept an
+approval refusal saying that the amount needs a held pinch and recording the click as
+the gesture that was tried. So the button is gone and the card now says in words what
+the rule is: only a hold settles, and a click can only say no. A lighter touch is not an
+accessibility improvement on a payment; a different hold is, and a controller squeeze is
+a hold.
+
 That browser run is also where a defect nobody had asked for turned up. A request naming
 a device in the moment between its account existing and its ledger landing was handed the
 account with nothing in it, which surfaced as a request that never answered rather than as
@@ -213,9 +249,14 @@ way on the build before this change; the client code for it is untouched, but it
 re-driven in the run above.
 
 The settlement-rail, currency and background-reconciliation work is covered by the
-service tests and by the client typecheck and build. None of it was driven in an XR
-session on this machine, so nothing about how those panels look or feel on the table
-should be read as tested.
+service tests and by the client typecheck and build, and the panels that report it are
+now rendered by the running client as above. What a browser cannot do is the hand. The
+token is picked up by a near grab, and a pointer makes nothing happen on it: pressing
+and holding where the coin sits was tried in the run above and produced no request at
+all, so the one-second hold, the state that only shows while a hold is settling, and
+everything about how this table reads from inside a headset remain unproven on this
+machine. The state machine those gestures drive is tested in the service; the gesture
+itself is not.
 
 Live immersive evidence was **not** captured on this machine: the managed XR browser
 would not start alongside the browser already running here, so no claim about headset

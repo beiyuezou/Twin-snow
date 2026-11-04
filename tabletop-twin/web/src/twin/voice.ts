@@ -1,14 +1,16 @@
 /**
- * The twin's mouth, and the two panels that carry everything it says.
+ * The twin's mouth, and the three panels that carry everything it says.
  *
  * Captions are not an extra here: the sentence the orb speaks is written to a
- * panel too, so the app works with the sound off and with colour taken away.
+ * panel too, so the app works with the sound off. Every state the twin is in is
+ * spelled in words as well as painted, because no colour in this palette is
+ * allowed to be the only signal that something changed.
  */
 
 import { Mesh, MeshStandardMaterial, Object3D, UIKit, Vector3, createSystem, type UIKitMLAsset } from '@iwsdk/core';
 import { twin } from './controller.js';
+import type { Payment, ScenePayload } from './client.js';
 import { Moods, TwinOrb } from './components.js';
-import { dayToX } from './layout.js';
 
 /** Seconds between heartbeat ticks. Each tick advances the world one day. */
 export const HEARTBEAT_SEC = 45;
@@ -19,6 +21,55 @@ const QUESTIONS: Record<string, string> = {
   'Btn-cancel': 'what if I cancel the plates subscription',
   'Btn-best': 'what is the best thing I could do',
 };
+
+/** How many payments the rails panel has room for; the rest are counted, not hidden. */
+const PAY_SLOTS = 3;
+
+type PanelState = 'idle' | 'speaking' | 'waiting' | 'asking' | 'offline';
+
+/**
+ * Blue, teal, amber, slate and orange-red: the backend's colourblind-safe set, and
+ * every pair differs in lightness as well as hue. The chip always carries the word.
+ */
+const SURFACE: Record<PanelState, { band: string; chip: string; edge: string }> = {
+  idle: { band: '#1a222c', chip: '#9aa5b1', edge: '#33414f' },
+  speaking: { band: '#12222f', chip: '#7fb3d5', edge: '#2e7dd1' },
+  waiting: { band: '#2b2412', chip: '#ffd166', edge: '#ffd166' },
+  asking: { band: '#122b28', chip: '#5bc8af', edge: '#5bc8af' },
+  offline: { band: '#2a1813', chip: '#e4572e', edge: '#e4572e' },
+};
+
+const STATE_WORD: Record<PanelState, string> = {
+  idle: 'listening',
+  speaking: 'speaking',
+  waiting: 'your hold',
+  asking: 'asking',
+  offline: 'offline',
+};
+
+/** A provider that has not answered is not a payment that landed. */
+const UNASKED = new Set(['unknown', 'reconciling']);
+
+interface Paint {
+  text?: string;
+  color?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  display?: 'none' | 'flex' | 'contents';
+}
+
+/** One way to write a field, so a missing element is a no-op rather than a thrown frame. */
+function put(panel: UIKitMLAsset | undefined, id: string, props: Paint): void {
+  panel?.getElementById<UIKit.Text>(id)?.setProperties(props);
+}
+
+function money(currency: string, dollars: number): string {
+  return `${currency} ${dollars.toFixed(2)}`;
+}
+
+function joined(parts: Array<string | undefined>): string {
+  return parts.filter((part) => part !== undefined && part !== '').join('  ·  ');
+}
 
 export class TwinVoiceSystem extends createSystem({
   orbs: { required: [TwinOrb] },
@@ -31,6 +82,9 @@ export class TwinVoiceSystem extends createSystem({
   private spoke = -99;
   private timer = HEARTBEAT_SEC;
   private stopping: Array<() => void> = [];
+  /** The oldest payment still waiting on its provider, which is what the chase button asks about. */
+  private chase = '';
+  private lastText = '';
   private readonly origin = new Vector3();
   private readonly target = new Vector3();
 
@@ -48,7 +102,6 @@ export class TwinVoiceSystem extends createSystem({
       break;
     }
     const captions = this.world.getSceneObject<UIKitMLAsset>('captions');
-    const approve = this.world.getSceneObject<UIKitMLAsset>('approve');
     for (const [id, intent] of Object.entries(QUESTIONS)) {
       const button = captions?.getElementById<UIKit.Text>(id);
       if (!button) continue;
@@ -56,14 +109,22 @@ export class TwinVoiceSystem extends createSystem({
       button.addEventListener('click', onClick);
       this.stopping.push(() => button.removeEventListener('click', onClick));
     }
-    const reject = approve?.getElementById<UIKit.Text>('Btn-reject');
+    const reject = this.world.getSceneObject<UIKitMLAsset>('approve')?.getElementById<UIKit.Text>('Btn-reject');
     if (reject) {
       const onClick = () => {
-        twin.pending = null;
-        twin.say('reject', 'Not spent. That money does not move without your pinch.');
+        const held = twin.pending;
+        if (held && !twin.settling) void twin.reject(held.action_id);
       };
       reject.addEventListener('click', onClick);
       this.stopping.push(() => reject.removeEventListener('click', onClick));
+    }
+    const chase = this.world.getSceneObject<UIKitMLAsset>('rails')?.getElementById<UIKit.Text>('Btn-chase');
+    if (chase) {
+      const onClick = () => {
+        if (this.chase) void twin.reconcile(this.chase);
+      };
+      chase.addEventListener('click', onClick);
+      this.stopping.push(() => chase.removeEventListener('click', onClick));
     }
     this.stopping.push(twin.subscribe(() => this.redraw()));
     this.redraw();
@@ -85,12 +146,8 @@ export class TwinVoiceSystem extends createSystem({
     void twin.tick(1, atEnd);
   }
 
-  private lastText = '';
-
   /** One redraw path: whatever the controller knows, the table shows. */
   private redraw(): void {
-    const panel = this.world.getSceneObject<UIKitMLAsset>('captions');
-    const approve = this.world.getSceneObject<UIKitMLAsset>('approve');
     const payload = twin.payload;
     const latest = twin.captions[twin.captions.length - 1];
     const text = twin.offline
@@ -100,29 +157,110 @@ export class TwinVoiceSystem extends createSystem({
       this.lastText = text;
       this.spoke = this.clock;
     }
-    panel?.getElementById<UIKit.Text>('CaptionText')?.setProperties({ text });
-    panel?.getElementById<UIKit.Text>('CaptionStep')?.setProperties({
-      text: twin.offline ? 'offline' : (latest?.step ?? 'idle'),
-    });
-    const route = twin.route
-      ? (twin.routeMeasured ? twin.route : `${twin.route} (not yet asked)`)
-      : 'planner: not reached';
-    panel?.getElementById<UIKit.Text>('StatusLine')?.setProperties({
-      text: [route, twin.account].filter(Boolean).join('  ·  '),
-    });
+    const state: PanelState = twin.offline
+      ? 'offline'
+      : twin.pending
+        ? (twin.settling ? 'asking' : 'waiting')
+        : this.clock - this.spoke < 6
+          ? 'speaking'
+          : 'idle';
 
+    this.paintCaptions(state, text, latest?.step ?? 'idle', payload);
+    this.paintApprove(state);
+    this.paintRails(payload);
+    this.pointAt(payload?.twin.look_at ?? '', payload?.focus ?? '');
+    this.mood(state);
+  }
+
+  private paintCaptions(state: PanelState, text: string, step: string, payload: ScenePayload | null): void {
+    const panel = this.world.getSceneObject<UIKitMLAsset>('captions');
+    const skin = SURFACE[state];
+    put(panel, 'CaptionCard', { borderColor: skin.edge });
+    put(panel, 'CaptionBand', { backgroundColor: skin.band });
+    put(panel, 'CaptionStep', { text: STATE_WORD[state], backgroundColor: skin.chip });
+    put(panel, 'CaptionRoute', {
+      text: twin.route
+        ? (twin.routeMeasured ? twin.route : `${twin.route} (not yet asked)`)
+        : 'planner: not reached',
+    });
+    put(panel, 'CaptionWho', { text: twin.account || (payload?.meta.persona ?? 'this table') });
+    put(panel, 'CaptionKind', { text: `step: ${step}` });
+    put(panel, 'CaptionDay', {
+      text: payload ? `day ${payload.meta.day + 1} of ${payload.meta.horizon_days}` : 'no day yet',
+    });
+    put(panel, 'CaptionText', { text });
+  }
+
+  private paintApprove(state: PanelState): void {
+    const panel = this.world.getSceneObject<UIKitMLAsset>('approve');
     const pending = twin.pending;
-    if (approve) approve.visible = pending !== null;
-    if (pending) {
-      const where = pending.country ? ` in ${pending.country}` : '';
-      approve?.getElementById<UIKit.Text>('ApproveText')?.setProperties({
-        text: `${pending.verb} ${pending.currency} ${pending.amount_dollars.toFixed(2)} to ` +
-          `${pending.recipient || 'them'}${where}, ${pending.rule}`,
+    if (panel) panel.visible = pending !== null;
+    if (!pending || !panel) return;
+    const skin = SURFACE[state];
+    put(panel, 'ApproveCard', { borderColor: skin.edge });
+    put(panel, 'ApproveBand', { backgroundColor: skin.band });
+    put(panel, 'ApproveState', { text: STATE_WORD[state], backgroundColor: skin.chip });
+    put(panel, 'ApproveHeld', {
+      text: state === 'asking' ? 'pinch received' : (pending.verb ? `${pending.verb}: by policy` : 'by policy'),
+    });
+    put(panel, 'ApproveAmount', { text: money(pending.currency, pending.amount_dollars) });
+    put(panel, 'ApproveTo', { text: joined([pending.recipient || 'nobody named', pending.country]) });
+    put(panel, 'ApproveWhy', { text: pending.reason, display: pending.reason ? 'flex' : 'none' });
+    put(panel, 'ApproveRule', {
+      text: joined([`rule: ${pending.rule}`, pending.rail, `fee ${money(pending.currency, pending.fee_dollars)}`]),
+    });
+  }
+
+  private paintRails(payload: ScenePayload | null): void {
+    const panel = this.world.getSceneObject<UIKitMLAsset>('rails');
+    if (!panel) return;
+    const meta = payload?.meta;
+    put(panel, 'RailName', { text: meta?.rail ?? 'no rail named' });
+    put(panel, 'RailFrom', { text: meta ? `${meta.currency}, sent from ${meta.country}` : 'currency unknown' });
+
+    const list = payload?.payments ?? [];
+    this.chase = list.find((payment) => UNASKED.has(payment.state))?.action_id ?? '';
+    for (let slot = 0; slot < PAY_SLOTS; slot += 1) {
+      const payment = list[slot];
+      put(panel, `Pay${slot}`, { display: payment ? 'flex' : 'none' });
+      if (!payment) continue;
+      put(panel, `PayState${slot}`, {
+        text: payment.state,
+        backgroundColor: UNASKED.has(payment.state) ? '#7fb3d5' : '#ffd166',
+      });
+      put(panel, `PayHow${slot}`, {
+        text: payment.fee_dollars > 0
+          ? `${money(payment.currency, payment.amount_dollars)} + ${payment.fee_dollars.toFixed(2)} fee`
+          : money(payment.currency, payment.amount_dollars),
+      });
+      put(panel, `PayWhom${slot}`, {
+        text: joined([
+          payment.recipient || 'nobody named',
+          payment.country,
+          payment.attempt > 1 ? `try ${payment.attempt}` : '',
+        ]),
       });
     }
+    const extra = list.length - PAY_SLOTS;
+    put(panel, 'RailMore', {
+      text: extra > 0 ? `+ ${extra} more in flight` : '',
+      display: extra > 0 ? 'flex' : 'none',
+    });
+    put(panel, 'RailNote', { text: this.railNote(list) });
+    put(panel, 'Btn-chase', { display: this.chase ? 'flex' : 'none' });
+  }
 
-    this.pointAt(payload?.twin.look_at ?? '', payload?.focus ?? '');
-    this.mood(pending !== null, this.clock - this.spoke < 6);
+  /**
+   * What the panel is allowed to claim. A record still open is money whose fate
+   * nobody has confirmed, so the sentence says that instead of reassuring.
+   */
+  private railNote(list: Payment[]): string {
+    if (list.length === 0) return 'Nothing is mid-flight.';
+    const unasked = list.filter((payment) => UNASKED.has(payment.state)).length;
+    if (unasked > 0) {
+      return `${unasked} of ${list.length} have no answer from the provider. The twin will not call them landed.`;
+    }
+    return `${list.length} asked and not yet settled. Nothing has left the table.`;
   }
 
   /** The orb turns toward whatever she just mentioned and puts a finger on it. */
@@ -149,9 +287,9 @@ export class TwinVoiceSystem extends createSystem({
     return undefined;
   }
 
-  private mood(waiting: boolean, speaking: boolean): void {
+  private mood(state: PanelState): void {
     if (!this.core) return;
-    const mood = waiting ? Moods.waiting : speaking ? Moods.speaking : Moods.idle;
+    const mood = state === 'waiting' ? Moods.waiting : state === 'speaking' || state === 'asking' ? Moods.speaking : Moods.idle;
     for (const entity of this.queries.orbs.entities) entity.setValue(TwinOrb, 'mood', mood);
     this.core.emissiveIntensity = mood === Moods.waiting ? 3.2 : mood === Moods.speaking ? 2.6 : 1;
   }

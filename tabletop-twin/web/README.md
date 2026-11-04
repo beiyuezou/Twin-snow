@@ -32,11 +32,18 @@ fight over the same transform.
 ## Accessibility
 
 Speech is mirrored as captions on a panel, so the app is complete with sound off.
-Every gesture has a ray-clickable equivalent on the panels. Probability, risk and
+Every gesture has a ray-clickable equivalent on the panels, with one deliberate
+exception: settling a payment above the approval floor takes a one-second hold, and no
+button on any panel does it. That is the machine's rule, not a missing control — the
+payment state machine refuses an approval whose gesture is not the held pinch and writes
+the refusal down — so the alternative is a different hold (a controller squeeze works)
+rather than a lighter touch. Refusing has a button. Probability, risk and
 growth are each carried by two channels — fog density and size, height and
 position relative to the table, garden growth rather than a dial — so colour is
 never the only signal, and the palette is chosen to stay separable for colourblind
-viewers.
+viewers. The same holds on the panels: a state change moves the band, the chip and the
+card border together, and the chip spells the state out, so no panel asks a person to
+read a colour to know what is being asked of them.
 
 ## Running it
 
@@ -53,7 +60,22 @@ and `npm run build` must both pass before a change is considered finished.
 Typechecking and the production build pass. The scene document validates against the
 SDK's own scene schema and against a component catalog built from the framework's
 real components plus the ones this app registers, so every asset id, component name
-and field authored in the scene or written at runtime is provably declared. Live
-visual, gesture and XR evidence was not captured here: the managed editor never
-became command-ready on this machine, so nothing in this file should be read as
-"tested on a headset" until someone runs it.
+and field authored in the scene or written at runtime is provably declared.
+
+The four panels were then rendered by the running client in a real browser against the
+dev server, from a device world with nothing stored. The caption card, the decision
+card, the money panel and the plate above the wheel all drew from the client's own
+redraw rather than from any test harness. A pointer press on the decision card's reject
+button sent the refusal to the service, which answered 200 and kept it as a rejection
+naming the reviewer and the reason; the caption card changed its whole surface to say
+what the record now reads, and the money panel went back to saying nothing is
+mid-flight. The same run tried to settle a payment with a click instead of a hold and
+the machine refused it, so the exception described under Accessibility is measured, not
+intended. Nothing reached the console and no request failed.
+
+What a browser cannot reach is the hand. The token is picked up by a near grab, and
+holding the pointer where the coin sits produced no request at all, so the one-second
+pinch, the panel state that only appears while a hold is settling, and everything about
+how this table reads from inside a headset remain unproven on this machine: the managed
+editor never became command-ready here. Nothing in this file should be read as "tested
+on a headset" until someone runs it.

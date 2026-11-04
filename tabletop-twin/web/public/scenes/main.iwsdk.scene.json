@@ -142,7 +142,7 @@
           "name": "Captions",
           "framingRole": "content",
           "content": { "type": "asset", "asset": "twin-captions" },
-          "transform": { "position": [-0.02, 0.42, -0.24], "rotationDeg": [-8, 0, 0] },
+          "transform": { "position": [-0.02, 0.36, -0.24], "rotationDeg": [-8, 0, 0] },
           "components": {
             "RayInteractable": {}
           }
@@ -152,10 +152,27 @@
           "name": "Approve Panel",
           "framingRole": "support",
           "content": { "type": "asset", "asset": "twin-approve" },
-          "transform": { "position": [0.56, 0.26, 0.12], "rotationDeg": [-6, -18, 0] },
+          "transform": { "position": [0.7, 0.34, -0.04], "rotationDeg": [-6, -21, 0] },
           "components": {
             "RayInteractable": {}
           }
+        },
+        {
+          "id": "rails",
+          "name": "Rails Panel",
+          "framingRole": "support",
+          "content": { "type": "asset", "asset": "twin-rails" },
+          "transform": { "position": [-0.78, 0.22, -0.22], "rotationDeg": [-10, 26, 0] },
+          "components": {
+            "RayInteractable": {}
+          }
+        },
+        {
+          "id": "wheel-plate",
+          "name": "Time Wheel Plate",
+          "framingRole": "support",
+          "content": { "type": "asset", "asset": "twin-wheel-plate" },
+          "transform": { "position": [-0.34, 0.15, 0.32], "rotationDeg": [-14, 16, 0] }
         }
       ]
     },

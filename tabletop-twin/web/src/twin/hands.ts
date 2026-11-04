@@ -7,7 +7,7 @@
  * A gesture never executes anything — it only ever asks.
  */
 
-import { Grabbed, Object3D, createSystem, type Entity } from '@iwsdk/core';
+import { Grabbed, Object3D, UIKit, createSystem, type Entity, type UIKitMLAsset } from '@iwsdk/core';
 import { APPROVAL_GESTURE, APPROVAL_HOLD_SEC } from './client.js';
 import { twin } from './controller.js';
 import { ApprovalPrompt, ForkRibbon, SubscriptionPipe, TimeWheel } from './components.js';
@@ -126,6 +126,7 @@ export class TwinHandsSystem extends createSystem({
     if (day !== this.pendingDay) {
       this.pendingDay = day;
       this.debounce = 0.2;
+      this.label(day + 1, horizon);
       return;
     }
     this.debounce -= delta;
@@ -146,11 +147,19 @@ export class TwinHandsSystem extends createSystem({
     if (this.queries.heldWheels.entities.size > 0) return;
     const turn = (payload.meta.day / Math.max(1, payload.meta.horizon_days)) * Math.PI * 2;
     this.wheel.rotation.y = -turn;
+    this.label(payload.meta.day + 1, payload.meta.horizon_days);
     for (const entity of this.queries.wheels.entities) {
       if (!entity.hasComponent(TimeWheel)) continue;
       entity.setValue(TimeWheel, 'day', payload.meta.day);
       entity.setValue(TimeWheel, 'turnDeg', (-turn * 180) / Math.PI);
     }
+  }
+
+  /** The plate above the wheel is the dial's own label, so it moves with the twist. */
+  private label(day: number, horizon: number): void {
+    const plate = this.world.getSceneObject<UIKitMLAsset>('wheel-plate');
+    plate?.getElementById<UIKit.Text>('WheelDay')?.setProperties({ text: `day ${day}` });
+    plate?.getElementById<UIKit.Text>('WheelSpan')?.setProperties({ text: `of ${horizon} days` });
   }
 }
 
