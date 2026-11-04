@@ -22,7 +22,7 @@ class TwinController {
   routeMeasured = true;
   account = '';
   private chased = new Set<string>();
-  private provisioning: Promise<void> | null = null;
+  private joining: Promise<boolean> | null = null;
   private listeners = new Set<Listener>();
 
   subscribe(listener: Listener): () => void {
@@ -68,49 +68,39 @@ class TwinController {
   }
 
   /**
-   * A table is nobody's world until the twin hands back a token, so this happens
-   * before anything is fetched. `?email=&password=` joins an existing account;
-   * otherwise this browser keeps the one it made for itself.
+   * Land on the world this browser was pointed at, if it was pointed at one.
+   *
+   * Nothing here signs anybody up. The device key rides on every request and the
+   * twin opens the world behind it, so the table is there before any account is.
+   * `?email=&password=` is the only text a headset can be handed, and it is the one
+   * way to join a world that already belongs to somebody.
    */
-  private async ensureToken(): Promise<void> {
-    if (session.token) {
-      this.account = session.name;
-      return;
-    }
-    // Two systems boot at once, so provisioning is one shared promise, not two signups.
-    this.provisioning ??= this.provision().finally(() => {
-      this.provisioning = null;
+  private async joinWorld(): Promise<void> {
+    if (!this.account) this.account = session.name;
+    const wanted = signedInFromUrl();
+    if (!wanted) return;
+    // Two systems boot at once, so joining is one shared promise, not two logins.
+    this.joining ??= this.authenticate(wanted.email, wanted.password).finally(() => {
+      this.joining = null;
     });
-    await this.provisioning;
+    await this.joining;
   }
 
-  private async provision(): Promise<void> {
-    const wanted = signedInFromUrl() ?? session.device();
-    const account = await this.call(
-      async () => {
-        try {
-          return await twinApi.login(wanted.email, wanted.password);
-        } catch {
-          return await twinApi.signup(wanted.email, wanted.password);
-        }
-      },
-      null,
-    );
-    if (!account) return;
-    session.set(account);
-    this.account = account.name;
-  }
-
-  async signIn(email: string, password: string): Promise<boolean> {
+  private async authenticate(email: string, password: string): Promise<boolean> {
     const account = await this.call(() => twinApi.login(email, password), null);
     if (!account) return false;
     session.set(account);
     this.account = account.name;
+    return true;
+  }
+
+  async signIn(email: string, password: string): Promise<boolean> {
+    if (!(await this.authenticate(email, password))) return false;
     await this.boot();
     return true;
   }
 
-  /** Leaving revokes the token server-side; the next boot opens a fresh world. */
+  /** Leaving revokes the token. The device still opens this table; only the name goes. */
   async signOut(): Promise<void> {
     if (session.token) await this.call(() => twinApi.logout(), null);
     session.set(null);
@@ -121,12 +111,16 @@ class TwinController {
   }
 
   async boot(): Promise<void> {
-    await this.ensureToken();
-    const [world, health] = await Promise.all([
+    await this.joinWorld();
+    const [world, health, me] = await Promise.all([
       this.call(() => twinApi.world(), null as ScenePayload | null),
       this.call(() => twinApi.health(), null),
+      this.call(() => twinApi.me(), null),
     ]);
     if (world) this.payload = world;
+    // A world nobody has named yet is still somebody's table, and the twin is the
+    // one that knows what to call it.
+    if (me && !this.account) this.account = me.name;
     if (health) {
       this.route = health.route;
       this.routeMeasured = health.route_is_measured;
@@ -214,7 +208,6 @@ class TwinController {
   }
 
   async tick(days: number, finalOfDay: boolean): Promise<Caption[]> {
-    await this.ensureToken();
     const result = await this.call(() => twinApi.tick(days, finalOfDay), null);
     if (!result) return [];
     this.captions = result.captions;

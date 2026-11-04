@@ -4,6 +4,10 @@ One account, one table, one world. The client sends gestures and scrub positions
 this answers with numbers it computed and sentences the persona is allowed to
 say. Nothing here trusts a value that arrived over the network to decide whether
 money moves, and nothing is shared between accounts.
+
+A table has no keyboard, so nobody is stopped at a door. The device id a browser
+carries names its world, and the first request that carries one opens it. Signing
+in later claims that same world rather than starting a second one beside it.
 """
 
 from __future__ import annotations
@@ -36,12 +40,21 @@ _cache: dict[str, Session] = {}
 _store: Store | None = None
 _demo: Session | None = None
 _reconciler: reconcile.ReconciliationLoop | None = None
+_store_opening = threading.Lock()
 
 
 def store() -> Store:
+    """The one connection every request writes through, opened by whoever asks first.
+
+    A browser boots two systems at once, so two first requests can arrive before
+    either has finished opening the file. The second waits rather than standing up a
+    second connection to a database that is mid-write.
+    """
     global _store
     if _store is None:
-        _store = Store(os.environ.get("TWIN_DB_PATH", "twin.db"))
+        with _store_opening:
+            if _store is None:
+                _store = Store(os.environ.get("TWIN_DB_PATH", "twin.db"))
     return _store
 
 
@@ -77,10 +90,52 @@ def bearer_token(request: Request) -> str:
     return header[7:].strip() if header[:7].lower() == "bearer " else ""
 
 
+DEVICE_HEADER = "X-Twin-Device"
+# A device id has to be long enough that nobody could guess their way into another
+# table. A short one is read as absent rather than trusted, because a headset with a
+# six-character id is an invitation, not a credential.
+DEVICE_MIN_LEN, DEVICE_MAX_LEN = 32, 128
+
+
+def device_key(request: Request) -> str:
+    raw = request.headers.get(DEVICE_HEADER, "").strip().lower()
+    if not DEVICE_MIN_LEN <= len(raw) <= DEVICE_MAX_LEN:
+        return ""
+    return raw if all(char in "0123456789abcdef" for char in raw) else ""
+
+
+_world_opening = threading.Lock()
+
+
+def ensure_world(user_id: str) -> None:
+    """Give an account the fictional ledger, unless something already gave it one.
+
+    Two first visits from one device race here. The loser must not seed the world the
+    winner has just written: SQLite would refuse the duplicate row, and a table that
+    cannot be read is a table that draws nothing.
+    """
+    with _world_opening:
+        if store().world_row(user_id) is None:
+            Session.seed_new_world(store(), user_id)
+
+
 def current_user(request: Request) -> str:
+    """Whose table this is: the signed-in account, else the account this device opened.
+
+    Nothing here asks a person to sign up. A request that carries neither a token nor
+    a device id still answers 401, though: without knowing whose world it is, the
+    service would be guessing which ledger to move money in.
+    """
     user_id = store().user_for_token(bearer_token(request))
-    if not user_id:
-        raise HTTPException(status_code=401, detail="sign in with an access token")
+    if user_id is None:
+        device = device_key(request)
+        if not device:
+            raise HTTPException(status_code=401, detail="send an access token or a device key")
+        user_id = store().user_for_device(device) or store().create_anonymous_user(device)
+    # An account and its world are written in two steps, and a browser boots two
+    # systems at once, so a request can name an account whose ledger has not landed
+    # yet. It waits here rather than being handed an empty table.
+    ensure_world(user_id)
     return user_id
 
 
@@ -206,25 +261,58 @@ class RailIn(BaseModel):
 
 
 @app.post("/v1/signup")
-def signup(body: SignUp) -> dict:
-    try:
-        user_id = store().create_user(body.email, body.name, body.password)
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    Session.seed_new_world(store(), user_id)
+def signup(body: SignUp, request: Request) -> dict:
+    """Claim an email for this device's world, or open a new one if it has none.
+
+    Signing up after the fact is not a second table. The anonymous account that the
+    device already owns gains an email and a password, so everything that was on the
+    world before — payments, forks, the audit trail — is still there afterwards. It
+    happens once: after that the credentials belong to the account, not to the device.
+    """
+    device = device_key(request)
+    user_id = store().user_for_device(device) if device else None
+    if user_id is not None and store().has_password(user_id):
+        # One world is claimed once. Rewriting the email and the password of an
+        # account that already has both is signing in, and signup refuses to do it.
+        raise HTTPException(status_code=409, detail="this table already has an account — sign in to it")
+    if user_id is not None:
+        try:
+            store().claim_account(user_id, body.email, body.name, body.password)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        ensure_world(user_id)
+    else:
+        try:
+            user_id = store().create_user(body.email, body.name, body.password)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        Session.seed_new_world(store(), user_id)
+        if device:
+            store().bind_device(user_id, device)
     return {"token": store().issue_token(user_id), "user_id": user_id, "name": store().user_name(user_id)}
 
 
 @app.post("/v1/login")
-def login(body: SignIn) -> dict:
+def login(body: SignIn, request: Request) -> dict:
     user_id = store().verify_password(body.email, body.password)
     if user_id is None:
         raise HTTPException(status_code=401, detail="that email and password do not match")
+    # A device that has no world of its own joins the one it signed into. A device
+    # that already owns one is left alone: its anonymous table keeps existing, and
+    # the token decides which world this browser looks at from now on.
+    device = device_key(request)
+    if device and store().user_for_device(device) is None:
+        store().bind_device(user_id, device)
     return {"token": store().issue_token(user_id), "user_id": user_id, "name": store().user_name(user_id)}
 
 
 @app.post("/v1/logout")
 def logout(request: Request) -> dict:
+    """Forget this token. The device behind it still opens the same world.
+
+    A headset has no keyboard to sign back in with, so revoking the credential that
+    was handed out must not also revoke the table itself.
+    """
     store().revoke_token(bearer_token(request))
     return {"signed_out": True}
 
@@ -235,6 +323,7 @@ def me(user_id: str = Depends(current_user)) -> dict:
     return {
         "user_id": user_id,
         "name": store().user_name(user_id),
+        "signed_in": store().has_password(user_id),
         "persona": s.persona.name,
         "day": s.day,
         "horizon_days": s.horizon_days,

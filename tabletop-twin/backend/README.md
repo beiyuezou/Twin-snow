@@ -127,11 +127,23 @@ verified, and the heartbeat keeps reporting that gap.
 
 ## Whose world it is
 
-Nobody sees anybody else's table. An account is created with an email and a
-password, and every request after that carries a bearer token; without one, the
-service answers 401 rather than guessing who is asking. Each account owns its own
-ledger, branches, payments, ceilings and history, and a world survives a restart
-because it is written to SQLite after every call that changes it.
+Nobody sees anybody else's table. A world belongs to an account, and an account is
+either claimed with an email and a password or opened by a device: the first request
+carrying a device key the service has not seen is given a world of its own, so a headset
+that has never signed in still has a table. What is refused is a request that names
+nobody — no token, no device key — which answers 401 rather than guessing who is asking.
+A token outranks a device key, and signing up afterwards puts an email and a password on
+the world the device already had instead of opening a second one beside it — once. After
+that the credentials belong to the account, and a second signup is refused. Each account
+owns its own ledger, branches, payments, ceilings and history, and a world survives a
+restart because it is written to SQLite after every call that changes it.
+
+A device key is a credential and is treated like one: 32 random bytes made in the
+browser, stored only as a hash, and read as absent when it is short enough to guess.
+An account and its ledger are two writes, so a request that names an account whose
+ledger has not landed waits for it rather than answering from an empty table. Signing
+out revokes the token and leaves the table on the device, because there is no keyboard
+to sign back in with.
 
 Everything the twin did is kept as an append-only action log — the ask, the verdict,
 the rule that decided it, the gesture that settled it, the reconciliation that

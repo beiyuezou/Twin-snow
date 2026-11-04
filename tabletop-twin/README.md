@@ -109,12 +109,14 @@ has the table open — and it still does not claim the paid-for thing arrived.
 
 ## Whose table this is
 
-Anyone can open a world. An account is created with an email and a password, and a
-browser that has never signed in provisions its own so the table is never empty;
-every request after that carries a bearer token, and a request without one is
-refused rather than answered with somebody else's cash flow. A world is written down
-after every change, so the same table, the same history and the same ceilings are
-there after a restart.
+Anyone can open a world, and nobody has to sign up to see one. A browser carries a
+device key, the service gives an unknown key a world of its own, and every account —
+claimed or anonymous — owns its own ledger, payments, branches and history. What is
+refused is a request that names nobody: with neither a bearer token nor a device key the
+service answers 401 rather than guessing whose cash flow to draw. A device key is a
+credential and is treated as one: it is stored only as a hash, and an id short enough to
+guess is refused instead of trusted. A world is written down after every change, so the
+same table, the same history and the same ceilings are there after a restart.
 
 Nothing the twin did is thrown away. Each ask, verdict, rule, gesture and
 reconciliation is kept as an append-only log and can be read back as entries or as a
@@ -167,31 +169,48 @@ origin the immersive client's own dev server uses, because a table that cannot r
 the service draws nothing), and `TWIN_RECONCILE_SEC` — off by default — turns on the
 background sweep of payments that are still waiting for an answer.
 
-A headset has no keyboard, so the client signs itself in: the first visit opens its
-own account and keeps it. To put a table on an account you already have, open the
-app once with `?email=...&password=...` and it joins that world from then on.
+A headset has no keyboard, so the client never asks for one. The first visit generates
+a device key — 32 random bytes it keeps — and carries it on every request; the service
+opens a world behind a key it has not seen. Signing up is optional and late: it puts an
+email and a password on the table that device already had, rather than opening a second
+one beside it. To land on an account you already have, open the app once with
+`?email=...&password=...`, and a browser with no world of its own joins that account
+from then on.
 
 ## Verification status
 
-The service is covered by 258 tests that run the forecast, the forks, the policy
-engine, the payment state machine, the settlement catalog, the accounts, the audit
-trail, the real PayPal transport and the Muse route — each of the last two against a
-gateway that answers on a socket, so a refused credential, a rate limit, a reply that
-never arrives, a stream that invents a figure mid-sentence and a gateway that refuses
-one request shape are all exercised here rather than discovered in production. No
-test ever holds a real credential: the environment is emptied around every one of
-them, and a test that wants an endpoint stands it up itself.
+The service is covered by 276 tests that run the forecast, the forks, the policy
+engine, the payment state machine, the settlement catalog, the accounts, the world a
+device opens for itself, the audit trail, the real PayPal transport and the Muse route —
+each of the last two against a gateway that answers on a socket, so a refused credential,
+a rate limit, a reply that never arrives, a stream that invents a figure mid-sentence and
+a gateway that refuses one request shape are all exercised here rather than discovered in
+production. Opening a world is two writes, so two first visits from one device are raced
+against each other on purpose — and the race was run with the guard switched off first,
+to check that there is something to guard. No test ever holds a real credential: the
+environment is emptied around every one of them, and a test that wants an endpoint stands
+it up itself.
 
 The client typechecks and builds, and its scene document validates against the SDK's
-own schema and component catalog, so every asset id, component and field the code
-names is real. Its account paths were then run in a real browser against the dev
-server: an account is provisioned before the first fetch, every request after it
-carries a bearer token, an anonymous request is refused, a pipe pulled with a pointer
-forks a second world, and a payment left in **unknown** is reconciled by the client on
-the next heartbeat without being asked. The streamed answer was checked the same way,
-against a localhost stand-in for the model gateway rather than a paid endpoint: the
-caption arrived in two pieces about a second apart and the answer the world kept was
-the whole verified sentence, with the route reported as the model that produced it.
+own schema and component catalog, so every asset id, component and field the code names
+is real. Its account paths were then run in a real browser against the dev server, from a
+profile with nothing stored: the first visit opened a table of its own with no signup and
+no token, every request it made answered 200 and nothing reached the console, signing up
+afterwards returned the same account, so did logging in with a token, logging out left the
+device on that same world, reloading came back to it, and a second browser profile was
+given a different one. A pipe pulled with a pointer forked a second world, and the
+streamed answer was checked the same way, against a localhost stand-in for the model
+gateway rather than a paid endpoint: the caption arrived in two pieces about a second
+apart and the answer the world kept was the whole verified sentence, with the route
+reported as the model that produced it.
+
+That browser run is also where a defect nobody had asked for turned up. A request naming
+a device in the moment between its account existing and its ledger landing was handed the
+account with nothing in it, which surfaced as a request that never answered rather than as
+an error anyone could read. It is now waited for, tested from both sides, and gone from
+the log above. Chasing an **unknown** payment on the next heartbeat was observed the same
+way on the build before this change; the client code for it is untouched, but it was not
+re-driven in the run above.
 
 The settlement-rail, currency and background-reconciliation work is covered by the
 service tests and by the client typecheck and build. None of it was driven in an XR

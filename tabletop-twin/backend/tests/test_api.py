@@ -1,7 +1,7 @@
 """The HTTP edge is where a gesture becomes a decision, so it is where the refusals matter.
 
-Every world belongs to an account, so the fixture signs one up rather than
-reaching into a shared singleton.
+Every world belongs to an account, and a device id opens one without a signup, so
+these fixtures arrive at a table two ways: by token and by the key a browser keeps.
 """
 
 from __future__ import annotations
@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -16,8 +18,24 @@ from fastapi.testclient import TestClient
 
 from fake_muse import read_sse
 from twin.api import main
+from twin.world.session import Session
 
 PASSWORD = "tabletop-2026"
+# The shape a headset's browser generates: 32 random bytes in hex. Anything shorter
+# is guessable, and a guessable id would be a way into somebody else's table.
+DEVICE = "d4" * 32
+OTHER_DEVICE = "e7" * 32
+
+
+def by_device(key: str) -> dict:
+    return {"X-Twin-Device": key}
+
+
+class StubRequest:
+    """The part of a request the dependency reads. Real headers ignore case; these match."""
+
+    def __init__(self, key: str) -> None:
+        self.headers = {"Authorization": "", "X-Twin-Device": key}
 
 
 @pytest.fixture()
@@ -43,10 +61,163 @@ def headers(client):
     return sign_up(client, "ada@acme.io", "Ada")
 
 
-def test_anonymous_cannot_see_someone_elses_table(client):
+def test_a_request_with_neither_token_nor_device_opens_no_world(client):
+    # Nothing is gated behind a signup, but "whose ledger" still has to be answered.
     assert client.get("/v1/world").status_code == 401
     assert client.post("/v1/ask", json={"intent": "can I pay this"}).status_code == 401
     assert client.get("/v1/audit").status_code == 401
+
+
+def test_a_device_never_seen_before_is_given_a_table(client):
+    me = client.get("/v1/me", headers=by_device(DEVICE)).json()
+    assert me["signed_in"] is False
+    assert len(me["user_id"]) == 32
+    world = client.get("/v1/world", headers=by_device(DEVICE)).json()
+    assert world["boats"] and world["river"]["p50_dollars"]
+
+
+@pytest.mark.parametrize("weak", ["abc", "d4" * 15, "z" * 64, "d4" * 80, ""])
+def test_an_id_somebody_might_guess_is_not_read_as_a_device(client, weak):
+    assert client.get("/v1/world", headers=by_device(weak)).status_code == 401
+
+
+def test_two_first_visits_from_one_device_open_exactly_one_world(client, monkeypatch):
+    # Two systems boot in one browser at once, so a device's first visit is never a
+    # single request. Whichever arrives second must not seed the world the first has
+    # just written — that is a refused row and an empty table.
+    seeds: list[str] = []
+    seed_once = Session.seed_new_world
+
+    def counted(store, user_id):
+        seeds.append(user_id)
+        return seed_once(store, user_id)
+
+    monkeypatch.setattr(Session, "seed_new_world", staticmethod(counted))
+    gate = threading.Barrier(2)
+
+    def visit():
+        gate.wait()
+        return main.current_user(StubRequest(OTHER_DEVICE))
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        both = [future.result() for future in (pool.submit(visit), pool.submit(visit))]
+    assert both[0] == both[1]
+    assert len(seeds) == 1
+
+
+def test_a_device_is_never_handed_an_account_without_a_world(client):
+    # Opening a world is two writes: the account, then the ledger copied into it. A
+    # request that names the account in between must wait for the ledger instead of
+    # answering from an empty one — which is what a browser reports as a dead request.
+    user_id = main.store().create_anonymous_user(DEVICE)
+    assert main.store().world_row(user_id) is None
+    assert client.get("/v1/world", headers=by_device(DEVICE)).status_code == 200
+    assert client.get("/v1/me", headers=by_device(DEVICE)).json()["user_id"] == user_id
+
+
+def test_two_devices_do_not_share_one_table(client):
+    client.post("/v1/scrub", headers=by_device(DEVICE), json={"day": 44})
+    mine = client.get("/v1/me", headers=by_device(DEVICE)).json()
+    theirs = client.get("/v1/me", headers=by_device(OTHER_DEVICE)).json()
+    assert mine["user_id"] != theirs["user_id"]
+    assert mine["day"] == 44 and theirs["day"] == 0
+    # One request per device, no account in sight, and the same device is still itself.
+    assert client.get("/v1/me", headers=by_device(DEVICE)).json()["user_id"] == mine["user_id"]
+
+
+def test_a_device_returns_to_the_table_it_left_after_a_restart(client):
+    client.post("/v1/scrub", headers=by_device(DEVICE), json={"day": 44})
+    main.reset_state()
+    again = TestClient(main.app)
+    assert again.get("/v1/me", headers=by_device(DEVICE)).json()["day"] == 44
+
+
+def test_signup_keeps_the_world_the_device_had(client):
+    before = client.get("/v1/me", headers=by_device(DEVICE)).json()
+    client.post("/v1/scrub", headers=by_device(DEVICE), json={"day": 44})
+    token = client.post(
+        "/v1/signup", headers=by_device(DEVICE), json={"email": "ada@acme.io", "password": PASSWORD}
+    ).json()["token"]
+    after = client.get("/v1/me", headers={"Authorization": f"Bearer {token}"}).json()
+    # The same account, the same day: a person who signs up late joins the table they
+    # were already looking at rather than a fresh one with nothing on it.
+    assert after["user_id"] == before["user_id"]
+    assert after["day"] == 44 and after["signed_in"] is True and after["name"] == "ada"
+
+
+def test_signup_cannot_take_an_email_that_already_has_a_world(client):
+    sign_up(client, "grace@acme.io", "Grace")
+    refused = client.post(
+        "/v1/signup", headers=by_device(DEVICE), json={"email": "grace@acme.io", "password": PASSWORD}
+    )
+    assert refused.status_code == 409
+    # The device keeps the table it opened; a clash on an email is not a reason to lose it.
+    me = client.get("/v1/me", headers=by_device(DEVICE)).json()
+    assert me["signed_in"] is False and me["name"] == "this table"
+
+
+def test_a_world_is_claimed_once(client):
+    first = client.post(
+        "/v1/signup", headers=by_device(DEVICE), json={"email": "ada@acme.io", "password": PASSWORD}
+    ).json()
+    again = client.post(
+        "/v1/signup", headers=by_device(DEVICE), json={"email": "someone-else@acme.io", "password": PASSWORD}
+    )
+    # Changing an email and a password that already exist is signing in, not signing up.
+    assert again.status_code == 409 and "sign in" in again.json()["detail"]
+    assert client.get("/v1/me", headers={"Authorization": f"Bearer {first['token']}"}).json()["name"] == "ada"
+    assert client.post(
+        "/v1/login", json={"email": "someone-else@acme.io", "password": PASSWORD}
+    ).status_code == 401
+
+
+def test_login_does_not_move_a_device_off_the_table_it_opened(client):
+    signed_up = sign_up(client, "grace@acme.io", "Grace")
+    client.post("/v1/scrub", headers=by_device(DEVICE), json={"day": 44})
+    joined = client.post(
+        "/v1/login", headers=by_device(DEVICE), json={"email": "grace@acme.io", "password": PASSWORD}
+    ).json()
+    assert client.get("/v1/me", headers={"Authorization": f"Bearer {joined['token']}"}).json()["day"] == 0
+    assert client.get("/v1/me", headers=signed_up).json()["name"] == "Grace"
+    assert client.get("/v1/me", headers=by_device(DEVICE)).json()["day"] == 44
+
+
+def test_a_device_with_no_world_of_its_own_joins_the_one_it_signs_into(client):
+    bearer = sign_up(client, "grace@acme.io", "Grace")
+    graces_world = client.get("/v1/me", headers=bearer).json()["user_id"]
+    client.post("/v1/login", headers=by_device(DEVICE), json={"email": "grace@acme.io", "password": PASSWORD})
+    client.post("/v1/scrub", headers=bearer, json={"day": 12})
+    # No token left in the browser, and it still comes back to Grace's table.
+    me = client.get("/v1/me", headers=by_device(DEVICE)).json()
+    assert me["user_id"] == graces_world and me["day"] == 12 and me["name"] == "Grace"
+
+
+def test_logout_revokes_the_token_not_the_table(client):
+    token = client.post(
+        "/v1/signup", headers=by_device(DEVICE), json={"email": "ada@acme.io", "password": PASSWORD}
+    ).json()["token"]
+    bearer = {"Authorization": f"Bearer {token}"}
+    client.post("/v1/scrub", headers=bearer, json={"day": 44})
+    assert client.post("/v1/logout", headers=bearer).json() == {"signed_out": True}
+    assert client.get("/v1/me", headers=bearer).status_code == 401
+    # A headset cannot type a password back in, so leaving must not cost the world.
+    me = client.get("/v1/me", headers=by_device(DEVICE)).json()
+    assert me["day"] == 44 and me["signed_in"] is True and me["name"] == "ada"
+
+
+def test_an_unclaimed_world_cannot_be_signed_into_by_its_placeholder_email(client):
+    # The email slot holds an address that cannot exist and the password column holds
+    # nothing. Neither is a way in: a hash of nothing must not answer to a guess.
+    me = client.get("/v1/me", headers=by_device(DEVICE)).json()
+    placeholder = f"device-{me['user_id']}@device.invalid"
+    assert client.post("/v1/login", json={"email": placeholder, "password": PASSWORD}).status_code == 401
+
+
+def test_a_device_asks_the_table_it_opened(client):
+    answer = client.post("/v1/ask", headers=by_device(DEVICE), json={"intent": "will I run out by day 40"}).json()
+    assert answer["said"] and answer["route"] == "rules"
+    audit = client.get("/v1/audit", headers=by_device(DEVICE)).json()["entries"]
+    assert any(entry["kind"] == "intent" for entry in audit)
 
 
 def test_the_default_cors_origin_is_the_one_the_client_actually_runs_on(client):
@@ -55,10 +226,13 @@ def test_the_default_cors_origin_is_the_one_the_client_actually_runs_on(client):
     preflight = client.options("/v1/ask/stream", headers={
         "Origin": "https://localhost:8081",
         "Access-Control-Request-Method": "POST",
-        "Access-Control-Request-Headers": "authorization,content-type,accept",
+        "Access-Control-Request-Headers": "authorization,content-type,accept,x-twin-device",
     })
     assert preflight.headers["access-control-allow-origin"] == "https://localhost:8081"
-    assert "authorization" in preflight.headers["access-control-allow-headers"].lower()
+    allowed = preflight.headers["access-control-allow-headers"].lower()
+    assert "authorization" in allowed
+    # A world opened by a device is only reachable if the browser may send that header.
+    assert "x-twin-device" in allowed
 
 
 def test_signup_refuses_a_short_password_and_a_duplicate_email(client):

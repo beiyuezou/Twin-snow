@@ -25,6 +25,9 @@ from twin.policy.engine import Policy, policy_from_dict
 
 TOKEN_TTL_SEC = 30 * 24 * 60 * 60
 _SCRYPT = {"n": 2**14, "r": 8, "p": 1}
+# What a world that nobody has claimed yet calls itself. It is a placeholder in the
+# same sense the email slot is: both are replaced the first time a person signs up.
+ANONYMOUS_NAME = "this table"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS app_user (
@@ -32,8 +35,9 @@ CREATE TABLE IF NOT EXISTS app_user (
   email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   created_at REAL NOT NULL,
-  pw_salt TEXT NOT NULL,
-  pw_hash TEXT NOT NULL
+  pw_salt TEXT NOT NULL DEFAULT '',
+  pw_hash TEXT NOT NULL DEFAULT '',
+  device_key TEXT
 );
 CREATE TABLE IF NOT EXISTS access_token (
   token_hash TEXT PRIMARY KEY,
@@ -145,7 +149,8 @@ def _hash_password(password: str, salt: bytes) -> str:
     return hashlib.scrypt(password.encode(), salt=salt, dklen=32, **_SCRYPT).hex()
 
 
-def _token_hash(raw: str) -> str:
+def _secret_hash(raw: str) -> str:
+    """One-way, for anything that must never be readable from the database: a token, a device id."""
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -168,6 +173,7 @@ class Store:
         SQLite cannot diff a schema, so each added column is declared once here.
         """
         wanted = {
+            "app_user": {"device_key": "TEXT"},
             "world": {"currency": "TEXT NOT NULL DEFAULT 'USD'", "country": "TEXT NOT NULL DEFAULT ''",
                       "rail": "TEXT NOT NULL DEFAULT 'sandbox'"},
             "cash_event": {"country": "TEXT NOT NULL DEFAULT ''", "currency": "TEXT NOT NULL DEFAULT ''"},
@@ -184,6 +190,11 @@ class Store:
                 for name, declaration in columns.items():
                     if name not in have:
                         self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
+            # Created here rather than in the script above, because a database written
+            # before the column existed cannot be indexed on it until it has it. One
+            # device must answer to one account: a second row would be a second world
+            # for the same headset, opened by whichever request happened to arrive first.
+            self._conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS user_device ON app_user (device_key)")
             self._conn.commit()
 
     def close(self) -> None:
@@ -209,6 +220,80 @@ class Store:
                 raise ValueError("an account already uses that email") from exc
         return user_id
 
+    def create_anonymous_user(self, device_key: str) -> str:
+        """Open an account for a device nobody has seen before.
+
+        There is no email to verify and no password to forget: the device id is the
+        whole credential, so it is stored hashed, and the email slot holds an address
+        that cannot exist — which is what leaves that slot free for a real one later.
+        """
+        key = _secret_hash(device_key)
+        user_id = uuid.uuid4().hex
+        with self._lock:
+            try:
+                self._conn.execute(
+                    "INSERT INTO app_user (id, email, name, created_at, pw_salt, pw_hash, device_key)"
+                    " VALUES (?,?,?,?,?,?,?)",
+                    (user_id, f"device-{user_id}@device.invalid", ANONYMOUS_NAME, time.time(), "", "", key),
+                )
+                self._conn.commit()
+            except sqlite3.IntegrityError:
+                # A second first visit from one device races the first. Whichever
+                # insert landed owns the world, so the loser answers with that account
+                # instead of opening a table nobody will ever see.
+                row = self._conn.execute("SELECT id FROM app_user WHERE device_key = ?", (key,)).fetchone()
+                if row is None:
+                    raise
+                user_id = row["id"]
+        return user_id
+
+    def user_for_device(self, raw: str | None) -> str | None:
+        if not raw:
+            return None
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT id FROM app_user WHERE device_key = ?", (_secret_hash(raw),)
+            ).fetchone()
+        return row["id"] if row else None
+
+    def bind_device(self, user_id: str, raw: str) -> bool:
+        """Point a device at an account, so the next visit opens this world.
+
+        Refused once the device already answers to another account: moving it would
+        orphan the world it opened, and no sign-in should do that without being asked.
+        """
+        key = _secret_hash(raw)
+        with self._lock:
+            holder = self._conn.execute("SELECT id FROM app_user WHERE device_key = ?", (key,)).fetchone()
+            if holder is not None:
+                return holder["id"] == user_id
+            try:
+                self._conn.execute("UPDATE app_user SET device_key = ? WHERE id = ?", (key, user_id))
+                self._conn.commit()
+            except sqlite3.IntegrityError:
+                return False
+            return True
+
+    def claim_account(self, user_id: str, email: str, name: str, password: str) -> None:
+        """Put a real email and password on the account a device already owns.
+
+        The world is untouched: signing up after the fact buys a name for the table
+        that was already sitting there, not a second one beside it.
+        """
+        email = email.strip().lower()
+        if "@" not in email or len(password) < 8:
+            raise ValueError("needs a valid email and a password of at least 8 characters")
+        salt = os.urandom(16)
+        with self._lock:
+            try:
+                self._conn.execute(
+                    "UPDATE app_user SET email = ?, name = ?, pw_salt = ?, pw_hash = ? WHERE id = ?",
+                    (email, name.strip() or email.split("@")[0], salt.hex(), _hash_password(password, salt), user_id),
+                )
+                self._conn.commit()
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("an account already uses that email") from exc
+
     def verify_password(self, email: str, password: str) -> str | None:
         with self._lock:
             row = self._conn.execute(
@@ -219,6 +304,10 @@ class Store:
             # as a wrong password.
             _hash_password(password, b"not-a-real-salt")
             return None
+        if not row["pw_hash"]:
+            # A world opened by a device has no password, so nothing can match it —
+            # including the empty string this column holds.
+            return None
         if not hmac.compare_digest(_hash_password(password, bytes.fromhex(row["pw_salt"])), row["pw_hash"]):
             return None
         return row["id"]
@@ -228,13 +317,19 @@ class Store:
             row = self._conn.execute("SELECT name, email FROM app_user WHERE id = ?", (user_id,)).fetchone()
         return (row["name"] if row else "you") or "you"
 
+    def has_password(self, user_id: str) -> bool:
+        """Whether anybody has claimed this world with an email and a password."""
+        with self._lock:
+            row = self._conn.execute("SELECT pw_hash FROM app_user WHERE id = ?", (user_id,)).fetchone()
+        return bool(row and row["pw_hash"])
+
     def issue_token(self, user_id: str) -> str:
         raw = uuid.uuid4().hex + uuid.uuid4().hex
         now = time.time()
         with self._lock:
             self._conn.execute(
                 "INSERT INTO access_token (token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)",
-                (_token_hash(raw), user_id, now, now + TOKEN_TTL_SEC),
+                (_secret_hash(raw), user_id, now, now + TOKEN_TTL_SEC),
             )
             self._conn.commit()
         return raw
@@ -244,7 +339,7 @@ class Store:
             return None
         with self._lock:
             row = self._conn.execute(
-                "SELECT user_id, expires_at FROM access_token WHERE token_hash = ?", (_token_hash(raw),)
+                "SELECT user_id, expires_at FROM access_token WHERE token_hash = ?", (_secret_hash(raw),)
             ).fetchone()
         if row is None or row["expires_at"] < time.time():
             return None
@@ -254,7 +349,7 @@ class Store:
         if not raw:
             return
         with self._lock:
-            self._conn.execute("DELETE FROM access_token WHERE token_hash = ?", (_token_hash(raw),))
+            self._conn.execute("DELETE FROM access_token WHERE token_hash = ?", (_secret_hash(raw),))
             self._conn.commit()
 
     # ------------------------------------------------------------------ worlds
@@ -510,7 +605,7 @@ class Store:
         with self._lock:
             self._conn.execute(
                 "INSERT INTO connection (id, user_id, name, key_hash, created_at) VALUES (?,?,?,?,?)",
-                (connection_id, user_id, name.strip() or "unnamed", _token_hash(key), time.time()),
+                (connection_id, user_id, name.strip() or "unnamed", _secret_hash(key), time.time()),
             )
             self._conn.commit()
         return connection_id, key
@@ -527,7 +622,7 @@ class Store:
             row = self._conn.execute(
                 "SELECT user_id, key_hash FROM connection WHERE id = ?", (connection_id,)
             ).fetchone()
-        if row is None or not hmac.compare_digest(row["key_hash"], _token_hash(key)):
+        if row is None or not hmac.compare_digest(row["key_hash"], _secret_hash(key)):
             return None
         return row["user_id"]
 

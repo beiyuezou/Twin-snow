@@ -174,8 +174,10 @@ const DEVICE_KEY = 'twin.device';
 /**
  * Which world this browser is looking at.
  *
- * The token is the bearer credential the twin issued; without it every endpoint
- * answers 401, so a table that never signed in is a table that draws nothing.
+ * A token names an account once somebody has signed one in. Before that the device
+ * key does the same job: the twin opens a world for a device id it has never seen,
+ * so the table is alive on the first fetch and no signup stands in front of it.
+ * A request with neither is still refused — somebody has to say whose ledger moves.
  */
 export const session = {
   get token(): string | null {
@@ -196,29 +198,24 @@ export const session = {
     localStorage.removeItem(NAME_KEY);
   },
 
-  /** The credentials of the world this browser made for itself, kept so a reload rejoins it. */
-  device(): { email: string; password: string } {
+  /** Thirty-two random bytes, kept so a reload rejoins this world instead of opening another. */
+  device(): string {
     const saved = localStorage.getItem(DEVICE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as { email?: string; password?: string };
-        if (parsed.email && parsed.password) return { email: parsed.email, password: parsed.password };
-      } catch {
-        // A half-written entry is just a missing one.
-      }
-    }
-    const bytes = new Uint8Array(9);
+    // Anything that is not a device id — including the credentials an older build
+    // kept in this slot — is replaced, because a bad id is refused by the twin and
+    // the table would then draw nothing at all.
+    if (saved && /^[0-9a-f]{64}$/.test(saved)) return saved;
+    const bytes = new Uint8Array(32);
     crypto.getRandomValues(bytes);
     const id = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-    const account = { email: `twin-${id}@table.local`, password: id.repeat(2) };
-    localStorage.setItem(DEVICE_KEY, JSON.stringify(account));
-    return account;
+    localStorage.setItem(DEVICE_KEY, id);
+    return id;
   },
 };
 
 function headers(extra: Record<string, string> = {}): Record<string, string> {
   const token = session.token;
-  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+  return { 'X-Twin-Device': session.device(), ...extra, ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
@@ -314,10 +311,20 @@ async function askStream(intent: string, onPiece: (text: string) => void): Promi
 }
 
 export const twinApi = {
+  /** Gives this device's existing world an email and a password, or opens a fresh one. */
   signup: (email: string, password: string, name = '') => post<Account>('/v1/signup', { email, name, password }),
   login: (email: string, password: string) => post<Account>('/v1/login', { email, password }),
+  /** Revokes the token only. The device behind it still opens the same table. */
   logout: () => post<{ signed_out: boolean }>('/v1/logout', {}),
-  me: () => get<{ user_id: string; name: string; persona: string; day: number; horizon_days: number; events: number }>('/v1/me'),
+  me: () => get<{
+    user_id: string;
+    name: string;
+    signed_in: boolean;
+    persona: string;
+    day: number;
+    horizon_days: number;
+    events: number;
+  }>('/v1/me'),
   world: () => get<ScenePayload>('/v1/world'),
   health: () => get<{
     ok: boolean;
