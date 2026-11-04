@@ -185,7 +185,7 @@ from then on.
 
 ## Verification status
 
-The service is covered by 276 tests that run the forecast, the forks, the policy
+The service is covered by 287 tests that run the forecast, the forks, the policy
 engine, the payment state machine, the settlement catalog, the accounts, the world a
 device opens for itself, the audit trail, the real PayPal transport and the Muse route —
 each of the last two against a gateway that answers on a socket, so a refused credential,
@@ -196,6 +196,14 @@ against each other on purpose — and the race was run with the guard switched o
 to check that there is something to guard. No test ever holds a real credential: the
 environment is emptied around every one of them, and a test that wants an endpoint stands
 it up itself.
+
+That last habit is now a file of its own. Five failures with known answers — a payment
+left in a state nobody owns, a rail the catalog says cannot reach a country, a narration
+quoting a figure it was never given, a click offered in place of a hold, a ledger write
+that never lands — each runs twice: once expecting the bad outcome with the guard
+switched off, once expecting the machine to stop it. A test that only asks whether the
+fix is present can pass against a fix that does nothing; one that has to produce the
+failure first cannot.
 
 The client typechecks and builds, and its scene document validates against the SDK's
 own schema and component catalog, so every asset id, component and field the code names

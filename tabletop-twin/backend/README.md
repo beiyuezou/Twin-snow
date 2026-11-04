@@ -186,3 +186,16 @@ are gateways the tests stand up on localhost, and they answer on a socket rather
 as stubs precisely so the awkward failures can be provoked here instead of discovered
 in production: a refused credential that must not be asked twice, a rate limit that
 names a wait, and a reply that never arrives after the work was done.
+
+One file is held to a different standard, because a test written by whatever fixed the
+bug tends to ask a soft question. `tests/test_regressions.py` seeds a failure with a
+known answer and then runs that same seed twice: once as the world runs it, and once
+with the one protection removed — and the second run must produce the bad outcome, or
+it is not evidence of anything. Take the transition table away and a payment stuck in
+unknown really is charged twice. Point the same country at a rail whose map verifies
+nothing and the denial disappears. Release every sentence unchecked and the invented
+figure reaches the panel. Put the floor above the amount and a click settles what a
+click was never allowed to settle. Remove the seed-before-read and the request naming a
+device between its account and its ledger is a dead one rather than an error anyone
+could read. A final test checks that both halves of every row still exist, so a row
+cannot quietly lose its control and carry on passing.
