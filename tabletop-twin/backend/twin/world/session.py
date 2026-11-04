@@ -31,7 +31,8 @@ from twin.persona.persona import Persona, load_persona
 from twin.planner.model import ModelPlanner
 from twin.planner.rules import RulePlanner
 from twin.planner.tools import ToolCall, handler_map, parse_calls
-from twin.policy.engine import Action, Policy, SpendWindow, evaluate
+from twin.policy.engine import Action, Policy, SpendWindow, Verdict, evaluate
+from twin.safety.guardrails import Proposal, figures, parse_cents, review
 from twin.store import Store
 
 DEFAULT_HORIZON = 90
@@ -379,9 +380,10 @@ class Session:
             self.focus = f"day:{day}"
             return {"highlight": self.focus, "day": day, "p10_cents": self.baseline.p10[day], "p90_cents": self.baseline.p90[day], "note": note}
         if target == "event" and id:
-            event = self.ledger.by_id(id)
-            self.focus = f"event:{event.id}"
-            return {"highlight": self.focus, "label": event.label, "due_day": event.due_day, "note": note}
+            event = self._event(id)
+            if event is not None:
+                self.focus = f"event:{event.id}"
+                return {"highlight": self.focus, "label": event.label, "due_day": event.due_day, "note": note}
         if target == "branch" and id and id in self.branches:
             self.focus = f"branch:{id}"
             return {"highlight": self.focus, "label": self.branches[id].label, "note": note}
@@ -392,12 +394,13 @@ class Session:
         self,
         verb: str,
         event_id: str | None = None,
-        amount_cents: int = 0,
+        amount_cents: int | None = None,
         recipient: str = "",
         justification: str = "",
     ) -> dict:
-        event = self.ledger.by_id(event_id) if event_id else None
-        amount = int(amount_cents or (event.amount_cents if event else 0))
+        event = self._event(event_id)
+        stated = parse_cents(amount_cents)
+        amount = stated if stated is not None else (event.amount_cents if event else 0)
         who = recipient or (event.counterparty if event else "")
         country = (event.country if event else "") or self._country_of(who)
         currency = self.ledger.currency
@@ -413,24 +416,52 @@ class Session:
             country=country,
             currency=currency,
         )
-        decision = evaluate(
-            action, self.policy, self.window, self.day, rail=rail, sender_country=self.ledger.country
-        )
         fee = self._fee_estimate(rail, amount, country, event)
-        reason = decision.reason
-        if decision.rule == "rail_unavailable":
-            alternatives = [
-                name
-                for name in load_catalog().reachable(country, self.ledger.country, currency)
-                if name != self.rail
-            ]
-            reason = f"{reason}. Rails that could reach it here: {', '.join(alternatives) or 'none the twin knows'}"
-        self.record(
-            "policy",
-            {"tool": "propose_action", "verb": verb, "verdict": decision.verdict.value, "rule": decision.rule,
-             "amount_cents": amount, "recipient": who, "country": country, "currency": currency,
-             "rail": self.rail, "fee_cents": fee, "reason": reason},
+        guard = review(
+            Proposal(
+                verb=verb,
+                event_id=event_id,
+                stated_amount_cents=stated,
+                stated_recipient=recipient,
+                amount_cents=amount,
+                recipient=who,
+                justification=justification,
+                is_charge=is_charge,
+                stated_amount_text="" if amount_cents is None else str(amount_cents),
+            ),
+            event=event,
+            given=self._given(amount, fee, event),
         )
+        # The guard reads the proposal before the budget does. Whether this person allows
+        # 240 dollars is their decision; whether a bill they own costs 240 dollars is a fact
+        # about their ledger, and a model does not get to settle it.
+        if guard.cleared:
+            decision = evaluate(
+                action, self.policy, self.window, self.day, rail=rail, sender_country=self.ledger.country
+            )
+            verdict, rule = decision.verdict.value, decision.rule
+            reason = decision.reason
+            if rule == "rail_unavailable":
+                alternatives = [
+                    name
+                    for name in load_catalog().reachable(country, self.ledger.country, currency)
+                    if name != self.rail
+                ]
+                reason = f"{reason}. Rails that could reach it here: {', '.join(alternatives) or 'none the twin knows'}"
+            self.record(
+                "policy",
+                {"tool": "propose_action", "verb": verb, "verdict": verdict, "rule": rule,
+                 "amount_cents": amount, "recipient": who, "country": country, "currency": currency,
+                 "rail": self.rail, "fee_cents": fee, "reason": reason},
+            )
+        else:
+            verdict, rule, reason = Verdict.DENY.value, guard.rule, guard.reason
+            self.record(
+                "guardrail",
+                {"tool": "propose_action", "verb": verb, "rule": rule, "event_id": event_id,
+                 "stated_amount_cents": stated, "stated_recipient": recipient, "amount_cents": amount,
+                 "recipient": who, "justification": justification, "reason": reason},
+            )
         payload = {
             "action_id": action.id,
             "verb": verb,
@@ -442,18 +473,24 @@ class Session:
             "rail": self.rail,
             "fee_cents": fee,
             "fee_dollars": dollars(fee),
-            "verdict": decision.verdict.value,
+            "verdict": verdict,
             "reason": reason,
-            "rule": decision.rule,
+            "rule": rule,
             "state": None,
             "idempotency_key": None,
         }
+
+        if not guard.cleared:
+            # Nothing stopped here ever became a payment, so there is no record to cancel
+            # and no gesture that could revive it.
+            payload["blocked"] = reason
+            return payload
 
         if not is_charge:
             # Chasing or cancelling moves nothing today, so it never enters the machine.
             # A refused verb is not even simulated: the twin does not get to rehearse a
             # thing it is not allowed to do.
-            if decision.verdict.value == "deny":
+            if verdict == "deny":
                 payload["blocked"] = reason
             else:
                 payload["effect"] = self._fork_for(verb, event)
@@ -466,12 +503,12 @@ class Session:
         payload["idempotency_key"] = record.idempotency_key
         self.pending[action.id] = record.idempotency_key
         self.actions[action.id] = action
-        if decision.verdict.value == "deny":
-            payload["state"] = self.machine.cancel(record, f"policy: {decision.rule}").state.value
+        if verdict == "deny":
+            payload["state"] = self.machine.cancel(record, f"policy: {rule}").state.value
             # A policy denial is finished business. Leaving it "pending" would invite a
             # human to reject something that already cannot move.
             self.pending.pop(action.id, None)
-        elif decision.verdict.value == "allow":
+        elif verdict == "allow":
             # Below the floor the policy itself is the approval; there is no gesture to wait for.
             self.machine.approve(record, "auto")
             payload["state"] = self._settle(record).value
@@ -685,6 +722,38 @@ class Session:
             "settlement_note": rail.settlement_note if rail else "Nothing leaves this machine.",
         }
 
+    def _event(self, event_id: str | None) -> CashEvent | None:
+        """The named event, or None. A name that matches nothing is an answer, not a crash.
+
+        `ledger.by_id` raises, which is right inside this service's own code and wrong at
+        a boundary where the name arrived from outside it.
+        """
+        if not event_id:
+            return None
+        return next((event for event in self.ledger.events if event.id == event_id), None)
+
+    def _given(self, amount_cents: int, fee_cents: int, event: CashEvent | None) -> set[str]:
+        """Every figure this action was computed from, in the spellings speech may use.
+
+        The guard allows a reason to restate these and refuses the rest. The person's own
+        limits are in here too: a model that names the approval floor is quoting the
+        policy this service loaded, not inventing a number.
+        """
+        policy = self.policy
+        values: list[object] = [
+            amount_cents, dollars(amount_cents), fee_cents, dollars(fee_cents), self.day,
+            policy.max_single_cents, dollars(policy.max_single_cents),
+            policy.approval_floor_cents, dollars(policy.approval_floor_cents),
+            policy.daily_spend_cap_cents, dollars(policy.daily_spend_cap_cents),
+            policy.monthly_spend_cap_cents, dollars(policy.monthly_spend_cap_cents),
+        ]
+        if event is not None:
+            values += [event.amount_cents, dollars(event.amount_cents), event.due_day,
+                       event.occurrences, event.late_fee_cents, dollars(event.late_fee_cents)]
+            if event.recurring_every_days:
+                values += [event.recurring_every_days, event.due_day + self.day]
+        return figures(*values)
+
     def _country_of(self, recipient: str) -> str:
         for event in self.ledger.events:
             if event.counterparty == recipient and event.country:
@@ -707,7 +776,9 @@ class Session:
     def tool_quote_rails(self, event_id: str | None = None, recipient: str = "",
                          amount_cents: int | None = None) -> dict:
         """Every rail, cheapest first, with the reason any of them cannot deliver this."""
-        event = self.ledger.by_id(event_id) if event_id else None
+        event = self._event(event_id)
+        if event_id and event is None:
+            return {"skipped": f"'{event_id}' is not an event in this ledger"}
         who = recipient or (event.counterparty if event else "")
         country = (event.country if event else "") or self._country_of(who)
         amount = int(amount_cents or (event.amount_cents if event else 0))
