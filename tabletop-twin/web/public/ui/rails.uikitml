@@ -71,6 +71,7 @@
       line-height: 1.3;
       color: #9aa5b1;
       text-align: left;
+      width: 44;
     }
     .chase {
       font-size: 2.2;
