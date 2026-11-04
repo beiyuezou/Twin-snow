@@ -200,6 +200,19 @@ class TwinController {
     this.emit();
   }
 
+  /**
+   * The newest line, rewritten rather than stacked. A sentence that arrives in
+   * pieces is one caption growing longer, not five captions.
+   */
+  private caption(step: string, text: string, target = ''): void {
+    if (!text) return;
+    const last = this.captions[this.captions.length - 1];
+    this.captions = last && last.step === step
+      ? [...this.captions.slice(0, -1), { step, text, target }]
+      : [...this.captions.slice(-5), { step, text, target }];
+    this.emit();
+  }
+
   async tick(days: number, finalOfDay: boolean): Promise<Caption[]> {
     await this.ensureToken();
     const result = await this.call(() => twinApi.tick(days, finalOfDay), null);
@@ -209,15 +222,31 @@ class TwinController {
     return result.captions;
   }
 
+  /**
+   * Ask, and let the answer arrive as it is phrased.
+   *
+   * Each piece the twin sends has already had its numbers checked, so growing the
+   * caption sentence by sentence is safe. When the whole answer arrives the caption
+   * is set from it rather than left as the sum of the pieces, because a stream that
+   * froze mid-sentence ends with a different sentence than the one it started.
+   */
   async ask(intent: string): Promise<string> {
-    const result = await this.call(() => twinApi.ask(intent), null);
-    if (!result) return '';
+    const pieces: string[] = [];
+    const result = await this.call(
+      () => twinApi.askStream(intent, (piece) => {
+        pieces.push(piece);
+        this.caption('answer', pieces.join(''));
+      }),
+      null,
+    );
+    if (!result) return pieces.join('');
     // Whichever endpoint answered is now known, not merely configured.
     if (result.route) {
       this.route = result.route;
       this.routeMeasured = true;
     }
     this.adopt(result.scene);
+    this.caption('answer', result.said ?? '');
     return result.said ?? '';
   }
 

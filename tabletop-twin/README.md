@@ -54,6 +54,17 @@ trusted with the phrasing is a different fact from a model that never called. Be
 anything has been asked, the service names the route it is *configured* for and marks
 it as not yet measured, which is the only claim the environment alone can support.
 
+The answer arrives as it is phrased. The service speaks Meta's agentic endpoint first —
+the one that can ask for several tools in a single reply and stream its words — and
+asks again in the compatible shape when a gateway objects to the request rather than to
+the credential. Streaming is not a licence to show half a sentence: the narration is
+released one finished sentence at a time, and only after the numbers in it have been
+checked against the forecast. A stream that invents a figure freezes where it is and the
+table keeps the sentence the rules computed instead, so the words on the panel are always
+either verified or absent. The same rule decides which model is asked at all: an entry
+the provider publishes for images, segmentation or transcription is named as the wrong
+tool and costs no request, while a name nobody has checked is tried rather than refused.
+
 ## Safety
 
 Spending limits, per-recipient ceilings and approval rules are enforced in code
@@ -151,9 +162,10 @@ thing that is never assumed: with no model key the service still answers, from t
 rule planner, and says which route it took. With no PayPal credentials it settles
 against a deterministic sandbox transport; the real transport has to be asked for
 explicitly and refuses to start without its credentials. `TWIN_DB_PATH` moves the
-store, `TWIN_ALLOW_ORIGINS` says which client origins may call it, and
-`TWIN_RECONCILE_SEC` — off by default — turns on the background sweep of payments
-that are still waiting for an answer.
+store, `TWIN_ALLOW_ORIGINS` says which client origins may call it (its default is the
+origin the immersive client's own dev server uses, because a table that cannot reach
+the service draws nothing), and `TWIN_RECONCILE_SEC` — off by default — turns on the
+background sweep of payments that are still waiting for an answer.
 
 A headset has no keyboard, so the client signs itself in: the first visit opens its
 own account and keeps it. To put a table on an account you already have, open the
@@ -161,11 +173,12 @@ app once with `?email=...&password=...` and it joins that world from then on.
 
 ## Verification status
 
-The service is covered by 234 tests that run the forecast, the forks, the policy
+The service is covered by 258 tests that run the forecast, the forks, the policy
 engine, the payment state machine, the settlement catalog, the accounts, the audit
 trail, the real PayPal transport and the Muse route — each of the last two against a
-gateway that answers on a socket, so a refused credential, a rate limit and a reply
-that never arrives are all exercised here rather than discovered in production. No
+gateway that answers on a socket, so a refused credential, a rate limit, a reply that
+never arrives, a stream that invents a figure mid-sentence and a gateway that refuses
+one request shape are all exercised here rather than discovered in production. No
 test ever holds a real credential: the environment is emptied around every one of
 them, and a test that wants an endpoint stands it up itself.
 
@@ -175,12 +188,15 @@ names is real. Its account paths were then run in a real browser against the dev
 server: an account is provisioned before the first fetch, every request after it
 carries a bearer token, an anonymous request is refused, a pipe pulled with a pointer
 forks a second world, and a payment left in **unknown** is reconciled by the client on
-the next heartbeat without being asked.
+the next heartbeat without being asked. The streamed answer was checked the same way,
+against a localhost stand-in for the model gateway rather than a paid endpoint: the
+caption arrived in two pieces about a second apart and the answer the world kept was
+the whole verified sentence, with the route reported as the model that produced it.
 
-The settlement-rail, currency and background-reconciliation work, and the model-route
-reporting added after it, are covered by the service tests and by the client typecheck
-and build. They were not driven in a browser or an XR session on this machine, so
-nothing about how those panels look or feel on the table should be read as tested.
+The settlement-rail, currency and background-reconciliation work is covered by the
+service tests and by the client typecheck and build. None of it was driven in an XR
+session on this machine, so nothing about how those panels look or feel on the table
+should be read as tested.
 
 Live immersive evidence was **not** captured on this machine: the managed XR browser
 would not start alongside the browser already running here, so no claim about headset

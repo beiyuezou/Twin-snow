@@ -1,29 +1,23 @@
-"""Muse (Meta's Model API) and any other OpenAI-compatible endpoint.
+"""Muse Spark / Claude through an OpenAI-compatible endpoint.
 
-Meta's Model API advertises drop-in compatibility with the OpenAI SDK, so one
-adapter covers Muse, Claude, or any local server that speaks the same shape. Each
-endpoint is configured on its own and reported under its own name: a route that
-says ``muse:...`` was answered by Meta's Model API, never by whatever happened to
-be in the environment.
+Two shapes are spoken here. Meta's own agentic endpoint, ``/v1/responses``, is used
+for Muse: it carries ``instructions`` and ``input``, returns parallel ``function_call``
+items, and streams narration as ``response.output_text.delta`` events. The
+``/chat/completions`` shape — which Meta states is drop-in compatible with the OpenAI
+SDK — is the fallback for every endpoint, and the one the generic route uses, because
+an unverified address is a plain OpenAI-compatible server by definition.
 
-What may be defaulted is decided by who publishes it. Meta publishes the address
-``https://api.meta.ai/v1``, the model name ``muse-spark-1.3`` and the variable
-``MODEL_API_KEY``, so a Muse key alone is a complete configuration and the route
-still names the variable the key came from. A generic endpoint has no published
-address, so base URL, key and model must all be present before it is offered. A
-credential is never defaulted, never guessed, never printed: without one there is
-no endpoint, the rule planner answers, and the service says so.
+Each endpoint is configured on its own and reported under its own name: a route that
+says ``muse:...`` was answered by Meta's Model API, never by whatever happened to be in
+the environment. What may be defaulted is decided by who publishes it: Meta publishes
+the address, the default model and the variable name, so a key alone is a complete Muse
+configuration. A credential is the one thing never assumed into existence.
 
-Failures are reported with the semantics they actually have. A 401 or 403 means the
-credential was refused and asking again only wastes a request, so it is never
-retried. A 429 says how long to wait and gets exactly one more attempt after that
-wait. A 5xx is transient and gets the same single repair attempt. Anything the
-endpoint says back is truncated before it reaches a route string, and the key itself
-never does.
-
-The guard that matters is `assert_numbers_are_given`. A model that invents a
-plausible dollar figure is worse than a model that says nothing, so narration is
-checked against the numbers the forecast actually produced.
+Two guards matter more than the rest. `assert_numbers_are_given`: a model that invents
+a plausible dollar figure is worse than a model that says nothing, so narration is
+checked against the numbers the forecast actually produced. And a stream is released
+sentence by sentence, each one verified before it is shown, so an invented figure
+never reaches the panel even while the rest of the sentence is still arriving.
 """
 
 from __future__ import annotations
@@ -37,17 +31,22 @@ import urllib.request
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
+from . import muse
 from .rules import RulePlanner
 from .tools import REGISTRY, ToolCall, ToolError, parse_calls
 
 MUSE = "muse"
 GENERIC = "openai-compatible"
 
-CHAT_PATH = "/chat/completions"
+MUSE_BASE_URL = muse.BASE_URL
+MUSE_MODEL = muse.DEFAULT_MODEL
+RESPONSES = muse.RESPONSES
+CHAT = muse.CHAT
 
-# Published by Meta, therefore safe to assume; the key below them never is.
-MUSE_BASE_URL = "https://api.meta.ai/v1"
-MUSE_MODEL = "muse-spark-1.3"
+# A refusal worth asking twice about: the endpoint objected to the shape of the
+# request, not to who sent it. A timeout or a rate limit is not that.
+SHAPE_REFUSALS = (400, 404, 422)
+
 MUSE_KEY_VARS = ("META_MODEL_API_KEY", "MODEL_API_KEY")
 MUSE_BASE_VARS = ("META_MODEL_BASE_URL",)
 MUSE_MODEL_VARS = ("META_MODEL_NAME",)
@@ -55,9 +54,7 @@ GENERIC_KEY_VARS = ("LLM_API_KEY", "OPENAI_COMPAT_API_KEY")
 GENERIC_BASE_VARS = ("LLM_BASE_URL", "OPENAI_COMPAT_BASE_URL")
 GENERIC_MODEL_VARS = ("LLM_MODEL", "OPENAI_COMPAT_MODEL")
 
-# A rate limit that asks for an hour is not worth blocking a table for.
 MAX_RETRY_SEC = 2.0
-# Long enough to diagnose a bad request, short enough to live in an audit entry.
 DETAIL_LIMIT = 140
 
 
@@ -67,6 +64,7 @@ class ModelConfig:
     api_key: str
     model: str
     provider: str = GENERIC
+    api: str = CHAT
     timeout_sec: float = 20.0
     max_output_tokens: int = 512
     max_retry_sec: float = MAX_RETRY_SEC
@@ -80,14 +78,31 @@ class ModelConfig:
     def host(self) -> str:
         return urlparse(self.base_url).netloc or self.base_url
 
-    @property
-    def url(self) -> str:
-        return f"{self.base_url}{CHAT_PATH}"
+    def url(self, api: str = "") -> str:
+        return f"{self.base_url}{muse.endpoint_path(api or self.api)}"
 
-    def reply(self, body: dict, opener=urllib.request.urlopen) -> dict:
-        """One HTTP call, translated into a payload or into a reason worth showing."""
-        request = urllib.request.Request(
-            self.url,
+    def endpoints(self) -> list[str]:
+        """The shapes this endpoint may be asked in, best first.
+
+        A model Meta only publishes for images or transcription is not asked in any
+        of them, and a model Meta does not publish on ``/v1/responses`` is not asked
+        there either. The compatible shape is listed last and only when Meta lists the
+        model on it: a refusal of a request shape is not a refusal of the model, but
+        asking a model where nobody publishes it would only spend a second request.
+        """
+        if muse.refusal(self.model):
+            return []
+        shapes = [self.api] if muse.serves(self.model, self.api) else []
+        if CHAT not in shapes and muse.serves(self.model, CHAT):
+            shapes.append(CHAT)
+        return shapes
+
+    def spoken(self, api: str) -> str:
+        return self.route if api == self.api else f"{self.route} via {api}"
+
+    def request(self, body: dict, api: str) -> urllib.request.Request:
+        return urllib.request.Request(
+            self.url(api),
             data=json.dumps(body).encode(),
             method="POST",
             headers={
@@ -95,17 +110,41 @@ class ModelConfig:
                 "Authorization": f"Bearer {self.api_key}",
             },
         )
-        try:
-            with opener(request, timeout=self.timeout_sec) as response:
-                raw = response.read()
-        except urllib.error.HTTPError as error:
-            raise _refusal(error, self) from error
-        except (urllib.error.URLError, TimeoutError, OSError) as error:
-            raise ModelUnavailable(f"{self.host} did not answer ({type(error).__name__})") from error
+
+    def reply(self, body: dict, api: str = "", opener=urllib.request.urlopen) -> dict:
+        """One call, read in full, translated into a payload or into a reason worth showing."""
+        response = self.send(body, api, opener)
+        with response:
+            raw = response.read()
         try:
             return json.loads(raw)
         except json.JSONDecodeError as error:
             raise ModelUnavailable(f"{self.host} answered with something that is not JSON") from error
+
+    def send(self, body: dict, api: str = "", opener=urllib.request.urlopen):
+        """Open the socket and fail here, not lazily, so a refusal is never silent."""
+        request = self.request(body, api or self.api)
+        try:
+            return opener(request, timeout=self.timeout_sec)
+        except urllib.error.HTTPError as error:
+            raise _refusal(error, self) from error
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            raise ModelUnavailable(f"{self.host} did not answer ({type(error).__name__})") from error
+
+    def stream(self, body: dict, api: str = "", opener=urllib.request.urlopen):
+        """Yield (event, payload) pairs from a streaming reply, closing it when done."""
+        response = self.send(body, api, opener)
+
+        def lines():
+            try:
+                yield from muse.iter_events(response)
+            finally:
+                try:
+                    response.close()
+                except Exception:
+                    pass
+
+        return lines()
 
 
 class ModelUnavailable(Exception):
@@ -138,7 +177,7 @@ def _refusal(error: urllib.error.HTTPError, config: ModelConfig) -> ModelUnavail
                                 retryable=True, retry_after_sec=_retry_after(error))
     if code >= 500:
         return ModelUnavailable(f"HTTP {code} from {config.host}{tail}", status=code, retryable=True)
-    return ModelUnavailable(f"HTTP {code} from {config.host}{tail}", status=code)
+    return ModelUnavailable(f"HTTP {code} from {config.url(config.api)}{tail}", status=code)
 
 
 def _retry_after(error: urllib.error.HTTPError) -> float | None:
@@ -174,7 +213,8 @@ def _first(names: tuple[str, ...]) -> tuple[str, str]:
 
 
 def _from_names(base_vars: tuple[str, ...], key_vars: tuple[str, ...], model_vars: tuple[str, ...],
-                provider: str, default_base: str = "", default_model: str = "") -> ModelConfig | None:
+                provider: str, api: str = CHAT, default_base: str = "",
+                default_model: str = "") -> ModelConfig | None:
     base, base_var = _first(base_vars)
     key, key_var = _first(key_vars)
     model, model_var = _first(model_vars)
@@ -188,7 +228,7 @@ def _from_names(base_vars: tuple[str, ...], key_vars: tuple[str, ...], model_var
         return None
     supplied = {"api_key": key_var, "base_url": base_var, "model": model_var}
     return ModelConfig(base_url=base.rstrip("/"), api_key=key, model=model,
-                       provider=provider, supplied=supplied)
+                       provider=provider, api=api, supplied=supplied)
 
 
 def providers_from_env() -> list[ModelConfig]:
@@ -199,9 +239,9 @@ def providers_from_env() -> list[ModelConfig]:
     a guess.
     """
     out = [
-        _from_names(MUSE_BASE_VARS, MUSE_KEY_VARS, MUSE_MODEL_VARS, MUSE,
+        _from_names(MUSE_BASE_VARS, MUSE_KEY_VARS, MUSE_MODEL_VARS, MUSE, api=RESPONSES,
                     default_base=MUSE_BASE_URL, default_model=MUSE_MODEL),
-        _from_names(GENERIC_BASE_VARS, GENERIC_KEY_VARS, GENERIC_MODEL_VARS, GENERIC),
+        _from_names(GENERIC_BASE_VARS, GENERIC_KEY_VARS, GENERIC_MODEL_VARS, GENERIC, api=CHAT),
     ]
     return [config for config in out if config is not None]
 
@@ -215,16 +255,20 @@ def route_details() -> list[dict]:
     """What each configured endpoint is, derived from the environment alone.
 
     Nothing here opens a socket: a deployment can say which model it intends to
-    speak to, and which of those words came from the operator rather than from a
-    published default, without proving it at the cost of a request.
+    speak to, in which shape, and which of those words came from the operator rather
+    than from a published default, without proving it at the cost of a request.
     """
     return [
         {
             "provider": config.provider,
             "model": config.model,
             "host": config.host,
-            "endpoint": config.url,
+            "api": config.api,
+            "api_alternatives": config.endpoints(),
+            "endpoint": config.url(),
             "timeout_sec": config.timeout_sec,
+            "catalogue": muse.describe(config.model),
+            "unusable": muse.refusal(config.model),
             "supplied_by": dict(config.supplied),
             # Fields with no variable behind them came from a published default.
             "assumed": sorted(name for name, source in config.supplied.items() if not source),
@@ -268,58 +312,121 @@ class ModelPlanner:
         return cls(configs[0]) if configs else None
 
     def plan(self, intent: str, context: dict) -> list[ToolCall]:
-        messages = [
-            {"role": "system", "content": self._system_prompt(context)},
-            {"role": "user", "content": intent},
-        ]
-        try:
-            payload = self._post(
-                {
-                    "model": self.config.model,
-                    "messages": messages,
-                    "tools": [t.to_openai() for t in REGISTRY.values()],
-                    "tool_choice": "auto",
-                    "max_tokens": self.config.max_output_tokens,
-                }
-            )
-            choice = payload["choices"][0]["message"]
-            calls = parse_calls(choice.get("tool_calls") or [])
-            if not calls:
-                raise ToolError("model returned no tool call")
-            self.last_route = self.config.route
-            return calls
-        except (ModelUnavailable, ToolError, KeyError, json.JSONDecodeError,
-                urllib.error.URLError, TimeoutError, OSError) as error:
-            self.last_route = f"rules ({_why(error)})"
+        blocked = muse.refusal(self.config.model)
+        if blocked:
+            self.last_route = f"rules ({blocked})"
             return self.fallback.plan(intent, context)
+        system = self._system_prompt(context)
+        bodies = [
+            (RESPONSES, muse.responses_body(
+                self.config.model, instructions=system, user_input=intent,
+                tools=muse.responses_tools(REGISTRY.values()), tool_choice="auto",
+                parallel=True, max_output_tokens=self.config.max_output_tokens)),
+            (CHAT, muse.chat_body(
+                self.config.model,
+                [{"role": "system", "content": system}, {"role": "user", "content": intent}],
+                tools=[t.to_openai() for t in REGISTRY.values()], tool_choice="auto",
+                max_tokens=self.config.max_output_tokens)),
+        ]
+        return self._ask_tools(bodies, intent, context)
 
-    def narrate(self, intent: str, results: list[dict], context: dict | None = None) -> str:
-        """Phrase the outcome in the persona's voice, then verify every number."""
+    def _ask_tools(self, bodies: list[tuple[str, dict]], intent: str, context: dict) -> list[ToolCall]:
+        failure: Exception | None = None
+        for api, body in bodies:
+            if api not in self.config.endpoints():
+                continue
+            try:
+                payload = self._post(body, api)
+                calls = parse_calls(muse.function_calls(payload))
+                if not calls:
+                    raise ToolError("model returned no tool call")
+                self.last_route = self.config.spoken(api)
+                return calls
+            except (ModelUnavailable, ToolError, KeyError, json.JSONDecodeError,
+                    urllib.error.URLError, TimeoutError, OSError) as error:
+                failure = error
+                if not _refused_the_shape(error):
+                    break
+        self.last_route = f"rules ({_why(failure)})"
+        return self.fallback.plan(intent, context)
+
+    def narrate(self, intent: str, results: list[dict], context: dict | None = None,
+                on_delta=None) -> str:
+        """Phrase the outcome in the persona's voice, then verify every number.
+
+        ``on_delta`` sees the narration a sentence at a time, and only after that
+        sentence has passed the same check the finished text has to pass.
+        """
         context = context or {}
         facts = json.dumps(_number_surface(results), sort_keys=True)
         given = number_tokens(facts)
         voice = self.voice_prompt or context.get("voice_prompt", "")
-        try:
-            payload = self._post(
-                {
-                    "model": self.config.model,
-                    "messages": [
-                        {"role": "system", "content": voice + "\nOnly use numbers from the FACTS block."},
-                        {"role": "user", "content": f"FACTS: {facts}\n\nSay what changed, in one or two sentences."},
-                    ],
-                    "max_tokens": 160,
-                }
-            )
-            text = payload["choices"][0]["message"]["content"].strip()
-            self.assert_numbers_are_given(text, given)
-            self.last_route = self.config.route
-            return text
-        except (NumberFabrication, ModelUnavailable, ToolError, KeyError, json.JSONDecodeError,
-                urllib.error.URLError, TimeoutError, OSError) as error:
-            self.last_route = f"rules (narration fell back: {_why(error)})"
+        ask = f"FACTS: {facts}\n\nSay what changed, in one or two sentences."
+        blocked = muse.refusal(self.config.model)
+        if blocked:
+            self.last_route = f"rules (narration fell back: {blocked})"
             return self.fallback.narrate("", results)
+        bodies = [
+            (RESPONSES, muse.responses_body(
+                self.config.model, instructions=voice + "\nOnly use numbers from the FACTS block.",
+                user_input=ask, max_output_tokens=160, stream=on_delta is not None)),
+            (CHAT, muse.chat_body(
+                self.config.model,
+                [{"role": "system", "content": voice + "\nOnly use numbers from the FACTS block."},
+                 {"role": "user", "content": ask}], max_tokens=160)),
+        ]
+        failure: Exception | None = None
+        for api, body in bodies:
+            if api not in self.config.endpoints():
+                continue
+            try:
+                if api == RESPONSES and body.get("stream"):
+                    text = self._stream_text(body, given, on_delta)
+                else:
+                    text = muse.text_of(self._post(body, api))
+                if not text:
+                    raise ToolError("model returned no words")
+                self.assert_numbers_are_given(text, given)
+                self.last_route = self.config.spoken(api)
+                return text
+            except (NumberFabrication, ModelUnavailable, ToolError, KeyError, json.JSONDecodeError,
+                    urllib.error.URLError, TimeoutError, OSError) as error:
+                failure = error
+                if not _refused_the_shape(error):
+                    break
+        self.last_route = f"rules (narration fell back: {_why(failure)})"
+        return self.fallback.narrate("", results)
 
-    def _post(self, body: dict) -> dict:
+    def _stream_text(self, body: dict, given: set[str], on_delta) -> str:
+        """Read a stream, releasing only sentences whose numbers have been checked.
+
+        Once a sentence fails the check the caption is frozen where it is: the words
+        already shown were all computed, and the rest is replaced by the rule
+        planner's own sentence when this returns.
+        """
+        text = ""
+        shown = 0
+        trusting = True
+        for event, payload in self.config.stream(body, RESPONSES, self._opener):
+            if event.endswith("completed") and payload:
+                final = muse.text_of(payload)
+                if final:
+                    text = final
+            piece = muse.delta_of(event, payload)
+            if piece:
+                text += piece
+            if not trusting or on_delta is None:
+                continue
+            release, safe = safe_release(text, given)
+            if not safe:
+                trusting = False
+                continue
+            if len(release) > shown:
+                on_delta(release[shown:])
+                shown = len(release)
+        return text.strip()
+
+    def _post(self, body: dict, api: str) -> dict:
         """Ask once. If the answer is 'busy', wait the pause asked for and ask once more.
 
         One repair attempt, never a loop: an endpoint that is refusing a credential
@@ -328,14 +435,14 @@ class ModelPlanner:
         """
         self.attempts = 1
         try:
-            return self.config.reply(body, self._opener)
+            return self.config.reply(body, api, self._opener)
         except ModelUnavailable as error:
             if not error.retryable:
                 raise
             self._sleeper(error.wait_sec(self.config.max_retry_sec))
         self.attempts += 1
         try:
-            return self.config.reply(body, self._opener)
+            return self.config.reply(body, api, self._opener)
         except ModelUnavailable as again:
             raise ModelUnavailable(f"{again.reason} (asked twice)", status=again.status) from again
 
@@ -362,7 +469,14 @@ class ModelPlanner:
         )
 
 
-def _why(error: Exception) -> str:
+def _refused_the_shape(error: Exception) -> bool:
+    """Only a rejection of the request's shape is worth re-asking in another shape."""
+    return isinstance(error, ModelUnavailable) and error.status in SHAPE_REFUSALS
+
+
+def _why(error: Exception | None) -> str:
+    if error is None:
+        return "no endpoint answered"
     if isinstance(error, ModelUnavailable):
         return error.reason
     if isinstance(error, KeyError):
@@ -370,6 +484,27 @@ def _why(error: Exception) -> str:
     if isinstance(error, json.JSONDecodeError):
         return "the reply was not JSON"
     return " ".join(str(error).split()) or type(error).__name__
+
+
+def safe_release(text: str, given: set[str]) -> tuple[str, bool]:
+    """The part of a narration that may be shown yet, and whether the rest is trusted.
+
+    Only whole sentences are released, because a number is only verifiable once it is
+    finished: "about $4" and "about $4,200" arrive in the same sentence and mean
+    different things.
+    """
+    released, safe = 0, True
+    start = 0
+    for index, character in enumerate(text):
+        if character not in ".!?\n":
+            continue
+        segment = text[start:index + 1]
+        if not number_tokens(segment).issubset(given):
+            safe = False
+            break
+        released = index + 1
+        start = index + 1
+    return text[:released], safe
 
 
 def _number_surface(results: list[dict]) -> dict:

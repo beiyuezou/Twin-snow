@@ -52,7 +52,7 @@ export class TwinVoiceSystem extends createSystem({
     for (const [id, intent] of Object.entries(QUESTIONS)) {
       const button = captions?.getElementById<UIKit.Text>(id);
       if (!button) continue;
-      const onClick = () => void twin.ask(intent).then((said) => twin.say('answer', said));
+      const onClick = () => void twin.ask(intent);
       button.addEventListener('click', onClick);
       this.stopping.push(() => button.removeEventListener('click', onClick));
     }

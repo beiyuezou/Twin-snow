@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from fake_muse import read_sse
 from twin.api import main
 
 PASSWORD = "tabletop-2026"
@@ -46,6 +47,18 @@ def test_anonymous_cannot_see_someone_elses_table(client):
     assert client.get("/v1/world").status_code == 401
     assert client.post("/v1/ask", json={"intent": "can I pay this"}).status_code == 401
     assert client.get("/v1/audit").status_code == 401
+
+
+def test_the_default_cors_origin_is_the_one_the_client_actually_runs_on(client):
+    # The immersive client is served over https on the IWSDK dev port. A default that
+    # names another origin means the browser blocks every call and the table draws nothing.
+    preflight = client.options("/v1/ask/stream", headers={
+        "Origin": "https://localhost:8081",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type,accept",
+    })
+    assert preflight.headers["access-control-allow-origin"] == "https://localhost:8081"
+    assert "authorization" in preflight.headers["access-control-allow-headers"].lower()
 
 
 def test_signup_refuses_a_short_password_and_a_duplicate_email(client):
@@ -98,6 +111,39 @@ def test_an_answer_names_the_route_that_produced_it(client, headers):
     answer = client.post("/v1/ask", headers=headers, json={"intent": "will I run out by day 40"}).json()
     assert answer["route"] == "rules"
     assert answer["narration_route"] == "rules"
+
+
+def test_a_streamed_ask_hands_the_caption_over_a_sentence_at_a_time(client, headers):
+    with client.stream("POST", "/v1/ask/stream", headers=headers,
+                      json={"intent": "will I run out by day 40"}) as reply:
+        assert reply.status_code == 200
+        assert reply.headers["content-type"].startswith("text/event-stream")
+        frames = read_sse(reply.iter_lines())
+    assert [name for name, _ in frames] == ["delta", "done"]
+    spoken, answer = frames[0][1], frames[1][1]
+    # The rules planner has one finished sentence, so it arrives as one piece.
+    assert spoken["text"] == answer["said"]
+    assert answer["route"] == "rules" and answer["narration_route"] == "rules"
+    assert answer["scene"]["river"]["p50_dollars"]
+    # Asking on the stream writes the world down exactly as asking in one go does.
+    entries = client.get("/v1/audit?limit=5", headers=headers).json()["entries"]
+    assert any(entry["kind"] == "intent" for entry in entries)
+
+
+def test_a_stream_that_cannot_finish_says_so_instead_of_hanging(client, headers, monkeypatch):
+    def explode(_s, intent, on_delta=None):
+        raise RuntimeError("the twin lost its numbers")
+
+    monkeypatch.setattr(main.Session, "ask", explode)
+    with client.stream("POST", "/v1/ask/stream", headers=headers,
+                      json={"intent": "will I run out by day 40"}) as reply:
+        frames = read_sse(reply.iter_lines())
+    assert [name for name, _ in frames] == ["failed"]
+    assert frames[0][1]["error"] == "the twin lost its numbers"
+
+
+def test_an_empty_intent_is_refused_on_the_stream_too(client, headers):
+    assert client.post("/v1/ask/stream", headers=headers, json={"intent": ""}).status_code == 422
 
 
 def test_an_endpoint_that_never_answers_is_named_as_the_thing_that_failed(client, headers, monkeypatch):

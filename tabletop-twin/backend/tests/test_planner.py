@@ -7,6 +7,7 @@ import json
 
 import pytest
 
+from twin.planner import muse
 from twin.planner.model import (
     MUSE,
     MUSE_BASE_URL,
@@ -192,7 +193,7 @@ def test_muse_is_chosen_and_named_when_both_endpoints_are_configured(clean_env):
     planner = ModelPlanner(planner.config, opener=opener)
     planner.plan("will the river hold", {"horizon_days": 90, "events": []})
     assert planner.last_route == "muse:llama-4-muse-spark"
-    assert opener.urls == ["https://muse.example/v1/chat/completions"]
+    assert opener.urls == ["https://muse.example/v1/responses"]
     assert opener.auth == ["Bearer muse-key"]
 
 
@@ -248,7 +249,11 @@ def test_a_route_report_says_what_would_be_called_without_calling_it(clean_env):
     [route] = route_details()
     assert route["provider"] == MUSE
     assert route["host"] == "api.meta.ai"
-    assert route["endpoint"] == f"{MUSE_BASE_URL}/chat/completions"
+    assert route["api"] == "responses"
+    assert route["endpoint"] == f"{MUSE_BASE_URL}/responses"
+    assert route["api_alternatives"] == ["responses", "chat"]
+    assert route["catalogue"]["published"] is True
+    assert route["unusable"] == ""
     assert route["supplied_by"] == {"api_key": "MODEL_API_KEY", "base_url": "", "model": ""}
     assert route["assumed"] == ["base_url", "model"]
     assert route["preferred"] is True
@@ -262,7 +267,30 @@ def test_an_explicit_address_and_model_leave_nothing_assumed(clean_env):
     [route] = route_details()
     assert route["assumed"] == []
     assert route["host"] == "muse.example"
-    assert route["endpoint"] == "https://muse.example/v1/chat/completions"
+    assert route["endpoint"] == "https://muse.example/v1/responses"
+
+
+def test_a_model_meta_does_not_publish_for_writing_is_reported_and_never_asked(clean_env):
+    for name, published in [("muse-image-1.0", "responses/images"), ("sam-3.1", "responses"),
+                            ("muse-voice-transcribe-1.0", "asr")]:
+        clean_env.setenv("META_MODEL_BASE_URL", "https://muse.example/v1")
+        clean_env.setenv("META_MODEL_API_KEY", "muse-key")
+        clean_env.setenv("META_MODEL_NAME", name)
+        [route] = route_details()
+        assert route["api_alternatives"] == []
+        assert route["unusable"] == f"{name} is published for {published}, not for writing text"
+        assert route["catalogue"]["writes_text"] is False
+
+
+def test_a_model_published_without_chat_is_not_offered_the_compatible_shape(monkeypatch, clean_env):
+    # A stand-in for the next line Meta publishes: on responses only, but it writes text.
+    monkeypatch.setitem(muse.CATALOGUE, "muse-fictional-1.0", (("responses",), True))
+    clean_env.setenv("META_MODEL_BASE_URL", "https://muse.example/v1")
+    clean_env.setenv("META_MODEL_API_KEY", "muse-key")
+    clean_env.setenv("META_MODEL_NAME", "muse-fictional-1.0")
+    [route] = route_details()
+    assert route["api_alternatives"] == ["responses"]
+    assert route["endpoint"] == "https://muse.example/v1/responses"
 
 
 def test_a_muse_reply_that_invents_numbers_is_still_refused_in_favour_of_rules():

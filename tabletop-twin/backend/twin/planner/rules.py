@@ -75,8 +75,19 @@ class RulePlanner:
             )
         return _dedupe(calls)
 
-    def narrate(self, intent: str, results: list[dict], context: dict | None = None) -> str:
-        """Plain-language readout assembled from computed facts only."""
+    def narrate(self, intent: str, results: list[dict], context: dict | None = None,
+                on_delta=None) -> str:
+        """Plain-language readout assembled from computed facts only.
+
+        A rules sentence is finished before it is spoken, so a stream sees all of it
+        in one piece — which is also what makes it safe to show.
+        """
+        said = self._said(results)
+        if on_delta is not None and said:
+            on_delta(said)
+        return said
+
+    def _said(self, results: list[dict]) -> str:
         quoted = next((result for result in results if "quotes" in result), None)
         if quoted:
             options = [row for row in quoted["quotes"] if not row["excluded"]]

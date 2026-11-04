@@ -30,6 +30,19 @@ plainly which fields came from the environment and which were assumed.
 them. A generic OpenAI-compatible server has no published address, so it still has to
 name all three of itself, and a route with no key is no route at all.
 
+Meta publishes two request shapes on that address, and the twin uses the agentic one
+first: `/v1/responses`, which takes `instructions` and `input`, can return several
+function calls in a single reply, and streams its words as events. `/chat/completions`
+is the compatible shape and stays the fallback, because what the documentation does not
+pin down is the shape of a tool definition on the agentic endpoint — so a request that
+is refused for its shape (400, 404, 422) is asked again in the other one, and the route
+names whichever finally answered. A refusal of the credential is never re-asked in a
+second shape: that would only spend another request on the same answer. The published
+model list is kept as data, and it decides what is asked at all: an entry Meta
+publishes for images, segmentation or transcription is named as the wrong tool and
+costs no request, while a name that is not in the list is tried rather than refused,
+because an unchecked entry is evidence about the catalog, not about the world.
+
 A refusal is answered with the semantics it actually has. A 401 or 403 means the
 credential was rejected and asking again only spends another request, so it is never
 retried. A 429 states how long to wait and gets exactly one more attempt after that
@@ -37,6 +50,15 @@ wait, capped at two seconds, because a headset is not going to sit through an ho
 5xx is treated as transient and given the same single repair. Whatever the endpoint
 says back is flattened and truncated before it reaches a route string, and the key
 itself never does: a status line may name `MODEL_API_KEY`, never what is in it.
+
+Streaming does not relax the number guard, it moves it earlier. Narration is released
+one finished sentence at a time — a clause is not shown until the figure inside it has
+arrived and been checked against the forecast, because "about $4" and "about $4,200"
+come in the same sentence and mean different things — and the moment a sentence fails
+that check the caption is frozen and the whole answer is replaced by the rule planner's
+verified sentence. The client is given the same final sentence as the world writes
+down, so what a person saw growing on the panel and what the audit trail kept can never
+be two different claims.
 
 Health reports the route it intends to use as *configured*, not as proven.
 `route_is_measured` stays false until something has actually been asked, because the

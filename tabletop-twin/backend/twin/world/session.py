@@ -573,7 +573,7 @@ class Session:
         handlers = handler_map(self)
         return handlers[call.tool](**call.args)
 
-    def ask(self, intent: str) -> dict:
+    def ask(self, intent: str, on_delta=None) -> dict:
         context = self.planner_context()
         calls = self.planner.plan(intent, context)
         # The two steps can take different routes: a model may choose the tool and
@@ -586,7 +586,7 @@ class Session:
                 results.append(self.run(call))
             except KeyError as exc:
                 results.append({"error": f"unknown event '{exc.args[0]}'"})
-        narration = self.planner.narrate(intent, results, context)
+        narration = self.planner.narrate(intent, results, context, on_delta=on_delta)
         self.last_speech = narration
         self.record("intent", {"intent": intent, "route": plan_route,
                                "narration_route": self.planner_route(),

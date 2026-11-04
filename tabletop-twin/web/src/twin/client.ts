@@ -242,6 +242,77 @@ async function get<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'GET', headers: headers() });
 }
 
+/** What one ask returns: the words, what they were computed from, and the scene. */
+export interface AskAnswer {
+  said: string;
+  focus: string;
+  route: string;
+  narration_route: string;
+  scene: ScenePayload;
+}
+
+/** One `event:`/`data:` pair, or null when the chunk is punctuation rather than a frame. */
+function parseFrame(chunk: string): { event: string; data: Record<string, unknown> } | null {
+  let event = '';
+  let data = '';
+  for (const line of chunk.split('\n')) {
+    if (line.startsWith('event:')) event = line.slice(6).trim();
+    if (line.startsWith('data:')) data += line.slice(5).trim();
+  }
+  if (!event || !data) return null;
+  try {
+    const payload = JSON.parse(data) as Record<string, unknown>;
+    return { event, data: payload };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The same ask, read off a live stream.
+ *
+ * `onPiece` sees each sentence the moment the twin has checked it — never a raw
+ * token, never a half-formed figure — and the promise resolves with the whole
+ * answer, which is the version the table writes down and the one to display.
+ */
+async function askStream(intent: string, onPiece: (text: string) => void): Promise<AskAnswer> {
+  const response = await fetch(`${BASE}/v1/ask/stream`, {
+    method: 'POST',
+    headers: headers({ 'Content-Type': 'application/json', Accept: 'text/event-stream' }),
+    body: JSON.stringify({ intent }),
+  });
+  if (!response.ok) {
+    if (response.status === 401 && session.token) session.set(null);
+    throw new Error('/v1/ask/stream -> ' + response.status);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('/v1/ask/stream answered with no body to read');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let answer: AskAnswer | null = null;
+  let refused = '';
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let cut = buffer.indexOf('\n\n');
+    while (cut >= 0) {
+      const frame = parseFrame(buffer.slice(0, cut));
+      buffer = buffer.slice(cut + 2);
+      cut = buffer.indexOf('\n\n');
+      if (!frame) continue;
+      if (frame.event === 'delta') onPiece(String(frame.data['text'] ?? ''));
+      if (frame.event === 'failed') refused = String(frame.data['error'] ?? 'the twin could not answer');
+      if (frame.event === 'done') answer = frame.data as unknown as AskAnswer;
+    }
+  }
+  if (refused) throw new Error(refused);
+  if (!answer) throw new Error('/v1/ask/stream ended before the answer arrived');
+  return answer;
+}
+
 export const twinApi = {
   signup: (email: string, password: string, name = '') => post<Account>('/v1/signup', { email, name, password }),
   login: (email: string, password: string) => post<Account>('/v1/login', { email, password }),
@@ -272,8 +343,7 @@ export const twinApi = {
   pull: (event_id: string) => post<{ fork: Fork; scene: ScenePayload }>('/v1/pull', { event_id }),
   tick: (days: number, final_of_day: boolean) =>
     post<{ day: number; captions: Caption[]; scene: ScenePayload }>('/v1/tick', { days, final_of_day }),
-  ask: (intent: string) =>
-    post<{ said: string; focus: string; route: string; narration_route: string; scene: ScenePayload }>('/v1/ask', { intent }),
+  askStream,
   propose: (calls: unknown[]) => post<{ results: Record<string, unknown>[]; scene: ScenePayload }>('/v1/tools', { calls }),
   approve: (action_id: string, gesture: string) =>
     post<{ action_id: string; state: string; error?: string }>('/v1/approve', { action_id, gesture }),

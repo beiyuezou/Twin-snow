@@ -8,17 +8,21 @@ money moves, and nothing is shared between accounts.
 
 from __future__ import annotations
 
+import json
 import os
+import queue
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from starlette.responses import StreamingResponse
 
 from twin.domain.events import event_from_dict
 from twin.payments.machine import IllegalTransition, TERMINAL
 from twin.payments.paypal import PayPalConfig, PayPalTransport, SandboxTransport
-from twin.planner.model import providers_configured, route_details
+from twin.planner.model import DETAIL_LIMIT, providers_configured, route_details
 from twin.planner.tools import ToolError, parse_calls
 from twin.payments.rails import SANDBOX_RAIL, load_catalog
 from twin.store import Store
@@ -98,8 +102,12 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Tabletop Twin", version="0.3.0", lifespan=lifespan)
-# The immersive client is served from the IWSDK dev server on its own port.
-_origins = [o for o in os.environ.get("TWIN_ALLOW_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if o]
+# The immersive client is served by the IWSDK dev server: https on 8081, with a
+# self-signed certificate — not Vite's default port. `TWIN_ALLOW_ORIGINS` replaces
+# this list rather than adding to it, because a served deployment has no reason to
+# keep a developer's laptop origin in it.
+_origins = [o for o in os.environ.get(
+    "TWIN_ALLOW_ORIGINS", "https://localhost:8081,https://127.0.0.1:8081").split(",") if o]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
@@ -282,6 +290,43 @@ def ask(body: Ask, s: Session = Depends(world_of)) -> dict:
     answer["scene"] = scene_payload(s)
     s.persist()
     return answer
+
+
+@app.post("/v1/ask/stream")
+def ask_stream(body: Ask, s: Session = Depends(world_of)) -> StreamingResponse:
+    """The same ask, spoken a sentence at a time while it is being phrased.
+
+    A `delta` frame is never a raw token: the planner releases only a finished
+    sentence whose numbers it has already checked against the forecast. The `done`
+    frame carries the whole answer and is the one the table writes down, so a
+    narration that got frozen mid-sentence is replaced by a verified sentence
+    rather than left half-spoken on the panel.
+    """
+    out: queue.Queue = queue.Queue()
+
+    def speak() -> None:
+        try:
+            answer = s.ask(body.intent, on_delta=lambda piece: out.put(("delta", {"text": piece})))
+            answer["scene"] = scene_payload(s)
+            s.persist()
+            out.put(("done", answer))
+        except Exception as error:  # a world that cannot finish must still say so on the wire
+            out.put(("failed", {"error": " ".join(str(error).split())[:DETAIL_LIMIT]}))
+        finally:
+            out.put(None)
+
+    def frames():
+        worker = threading.Thread(target=speak, daemon=True, name="twin-narration")
+        worker.start()
+        while True:
+            item = out.get()
+            if item is None:
+                return
+            name, payload = item
+            yield f"event: {name}\ndata: {json.dumps(payload, sort_keys=True)}\n\n"
+
+    return StreamingResponse(frames(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.post("/v1/tools")
