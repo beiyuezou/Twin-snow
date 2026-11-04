@@ -102,7 +102,12 @@ def evaluate_check(session: Session, check: dict) -> bool:
         branch = session.branches.get(check.get("branch", ""))
         return branch is not None and branch.forecast.p10[day] > baseline.p10[day]
     if kind == "event_arrived_by_day":
-        event = session.ledger.by_id(check["event_id"])
+        event = session._event(check["event_id"])
+        # A pipe pulled out of the ledger cannot arrive, so the call is a miss. The
+        # alternative is to raise, and a tick that raises stops the day from moving:
+        # deleting one bill would silence this world forever.
+        if event is None:
+            return False
         worst = max(event.lateness_days, default=0)
         return event.due_day + worst <= int(check["day"])
     return False
@@ -181,11 +186,16 @@ def one_test(session: Session, final_of_day: bool = False) -> list[Utterance]:
             check={"kind": "thinner_bank_lifts", "branch": result["branch"], "day": result["forecast"]["pinch_day"]},
         )
     )
+    floor = delta["min_balance_change_dollars"]
+    cost = delta["cost_change_dollars"]
+    # The deltas are signed, and "costs -40 dollars less" is a sentence nobody reads
+    # correctly, so the sign chooses the word and the figure keeps its magnitude.
+    floor_said = f"lifts the floor by {abs(floor)}" if floor >= 0 else f"lowers the floor by {abs(floor)}"
+    cost_said = f"costs {abs(cost)} less" if cost <= 0 else f"costs {abs(cost)} more"
     return [
         Utterance(
             "test",
-            f"I pulled {candidate.label} aside on the same seed. "
-            f"It moves the floor by {delta['min_balance_change_dollars']} dollars and costs {delta['cost_change_dollars']} less. "
+            f"I pulled {candidate.label} aside on the same seed. It {floor_said} dollars and {cost_said}. "
             f"That reads as {delta['verdict']} to me.",
             target=f"branch:{result['branch']}",
         )

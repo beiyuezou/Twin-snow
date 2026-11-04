@@ -8,7 +8,7 @@ same seed with that one protection removed and requires the *bad* outcome to app
 A row whose negative control stops failing has stopped proving anything, and the last
 test in this file notices.
 
-The five seeds:
+The six seeds:
 
 | failure                        | the thing that stops it                  | known answer                    |
 |--------------------------------|------------------------------------------|---------------------------------|
@@ -17,13 +17,10 @@ The five seeds:
 | a stream that invents a figure | numbers checked before any sentence shows| the rule sentence is what is kept |
 | a click offered as approval    | the approval floor                       | refused, and written down         |
 | a ledger that has not landed   | every request seeds before it reads      | the table arrives populated       |
+| a server that dropped its socket| the store notices a closed connection   | one open, then the world is there |
 """
 
 from __future__ import annotations
-
-import shutil
-import tempfile
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -41,6 +38,7 @@ from twin.payments.paypal import SandboxTransport
 from twin.payments.rails import load_catalog
 from twin.planner.model import ModelPlanner
 from twin.policy.engine import Action, SpendWindow, Verdict, evaluate
+from twin.store import Store, drop_schema, schema_name
 
 PASSWORD = "tabletop-2026"
 DEVICE = "b3" * 32
@@ -52,6 +50,7 @@ CORPUS = (
     ("invented_figure", "a streamed sentence with a number nobody computed"),
     ("click_as_approval", "a click offered in place of a held pinch"),
     ("ledger_not_landed", "a request naming an account whose ledger has not landed"),
+    ("dropped_connection", "a database socket that the server closed mid-session"),
 )
 
 
@@ -61,14 +60,14 @@ def by_device(key: str) -> dict:
 
 @pytest.fixture()
 def client(monkeypatch):
-    box = Path(tempfile.mkdtemp(prefix="twin-corpus-"))
-    monkeypatch.setenv("TWIN_DB_PATH", str(box / "twin.db"))
+    name = schema_name()
+    monkeypatch.setenv("TWIN_DB_SCHEMA", name)
     main.reset_state()
     try:
         yield TestClient(main.app)
     finally:
         main.reset_state()
-        shutil.rmtree(box, ignore_errors=True)
+        drop_schema(name)
 
 
 @pytest.fixture()
@@ -234,6 +233,44 @@ def test_ledger_not_landed_without_the_guard(client, monkeypatch):
     main.store().create_anonymous_user(FRESH_DEVICE)
     blunt = TestClient(main.app, raise_server_exceptions=False)
     assert blunt.get("/v1/world", headers=by_device(FRESH_DEVICE)).status_code == 500
+
+
+# --------------------------------------------------- 6. a socket the server dropped
+
+def visit(client: TestClient) -> int:
+    return client.get("/v1/world", headers=by_device(DEVICE)).status_code
+
+
+def kill_the_socket() -> None:
+    """Do to this process the thing a restarting Postgres does to its end of the link."""
+    main.store()._conn.close()
+
+
+def test_dropped_connection_known_answer(client):
+    assert visit(client) == 200
+    before = main.store()._conn
+    kill_the_socket()
+    assert visit(client) == 200, "a closed socket is noticed and another one is opened"
+    assert main.store()._conn is not before
+    body = client.get("/v1/world", headers=by_device(DEVICE)).json()
+    assert body["stones"], "the world came back with its table still on it"
+
+
+def test_dropped_connection_without_the_guard(client, monkeypatch):
+    """Skip the reopen and one dropped socket ends the run: every later call is a 500."""
+
+    def without_reopen(self, work):
+        with self._lock:
+            if self._conn is None:
+                self._open()
+            return work(self._conn)
+
+    monkeypatch.setattr(Store, "_do", without_reopen)
+    blunt = TestClient(main.app, raise_server_exceptions=False)
+    assert visit(blunt) == 200
+    kill_the_socket()
+    assert visit(blunt) == 500
+    assert visit(blunt) == 500, "a store that never reopens stays dead for the rest of the run"
 
 
 # ---------------------------------------------------------------------- the discipline
