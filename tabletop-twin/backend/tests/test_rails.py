@@ -663,17 +663,21 @@ def test_the_loop_sweeps_on_a_timer_and_reports_what_it_saw(store):
     loop = reconcile.ReconciliationLoop(store, Lookup(), 0.02)
     loop.start()
     try:
+        # Wait for the outcome rather than for the first sweep: the timer keeps
+        # sweeping while we look, and a later empty pass is free to overwrite
+        # "last_sweep" with a true but different answer.
         for _ in range(200):
-            if loop.status()["sweeps"]:
+            if not store.payments_in_state("unknown"):
                 break
             time.sleep(0.02)
     finally:
         loop.stop()
+        loop.join(2)
     status = loop.status()
     assert status["sweeps"] >= 1
-    assert status["last_sweep"]["settled"] == 1
     assert status["open_unknowns"] == 0
-    loop.join(2)
+    assert "error" not in status["last_sweep"]
+    assert [row["action_id"] for row in store.payments_in_state("succeeded")] == ["act-1"]
     assert not loop.is_alive()
 
 

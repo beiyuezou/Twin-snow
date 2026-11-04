@@ -18,6 +18,8 @@ class TwinController {
   captions: Caption[] = [];
   offline = false;
   route = '';
+  /** False while the route is only what the environment says it would be. */
+  routeMeasured = true;
   account = '';
   private chased = new Set<string>();
   private provisioning: Promise<void> | null = null;
@@ -125,7 +127,10 @@ class TwinController {
       this.call(() => twinApi.health(), null),
     ]);
     if (world) this.payload = world;
-    if (health) this.route = health.route;
+    if (health) {
+      this.route = health.route;
+      this.routeMeasured = health.route_is_measured;
+    }
     this.offline = !world;
     this.emit();
   }
@@ -207,6 +212,11 @@ class TwinController {
   async ask(intent: string): Promise<string> {
     const result = await this.call(() => twinApi.ask(intent), null);
     if (!result) return '';
+    // Whichever endpoint answered is now known, not merely configured.
+    if (result.route) {
+      this.route = result.route;
+      this.routeMeasured = true;
+    }
     this.adopt(result.scene);
     return result.said ?? '';
   }

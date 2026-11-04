@@ -45,6 +45,15 @@ and then explains the result in plain sentences. It cannot author a figure, and 
 missing or slow model never blocks the table: the client degrades to "the twin is
 not answering, nothing has been spent".
 
+Every answer also says who produced it. A route of `muse:...` was answered by Meta's
+Model API; a route beginning `rules (` carries the reason it was not, in the words the
+failure actually gave — a refused credential, a rate limit that outlasted the one
+repair it was offered, a gateway that hung up mid-sentence. The two halves of an
+answer are reported separately, because a model that picks the tool and then cannot be
+trusted with the phrasing is a different fact from a model that never called. Before
+anything has been asked, the service names the route it is *configured* for and marks
+it as not yet measured, which is the only claim the environment alone can support.
+
 ## Safety
 
 Spending limits, per-recipient ceilings and approval rules are enforced in code
@@ -130,11 +139,16 @@ npm install && npm run dev                            # from the web directory
 ```
 
 The client reads `VITE_TWIN_API` for the service origin. The service reads names of
-credentials, never values checked into this repository: `LLM_API_KEY`,
-`LLM_BASE_URL`, `LLM_MODEL` for a text planner, `META_MODEL_API_KEY`,
-`META_MODEL_BASE_URL`, `META_MODEL_NAME` for the Muse route, and `PAYPAL_CLIENT_ID`,
-`PAYPAL_SECRET`, `PAYPAL_ENVIRONMENT` for settlement. With no model keys the service
-still answers and says which route it took. With no PayPal credentials it settles
+credentials, never values checked into this repository. Muse — Meta's Model API —
+needs one of them: `MODEL_API_KEY`, Meta's own variable name, or
+`META_MODEL_API_KEY`. Its address and default model are the ones Meta publishes, so a
+key alone is a whole route; `META_MODEL_BASE_URL` and `META_MODEL_NAME` replace them
+when a deployment has a different agreement with the same API. Any other
+OpenAI-compatible server has no published address, so it needs all three of its own:
+`LLM_API_KEY` with `LLM_BASE_URL` and `LLM_MODEL`. Settlement reads
+`PAYPAL_CLIENT_ID`, `PAYPAL_SECRET`, `PAYPAL_ENVIRONMENT`. A credential is the one
+thing that is never assumed: with no model key the service still answers, from the
+rule planner, and says which route it took. With no PayPal credentials it settles
 against a deterministic sandbox transport; the real transport has to be asked for
 explicitly and refuses to start without its credentials. `TWIN_DB_PATH` moves the
 store, `TWIN_ALLOW_ORIGINS` says which client origins may call it, and
@@ -147,9 +161,13 @@ app once with `?email=...&password=...` and it joins that world from then on.
 
 ## Verification status
 
-The service is covered by 208 tests that run the forecast, the forks, the policy
+The service is covered by 234 tests that run the forecast, the forks, the policy
 engine, the payment state machine, the settlement catalog, the accounts, the audit
-trail and the real PayPal transport against a gateway that answers on a socket.
+trail, the real PayPal transport and the Muse route — each of the last two against a
+gateway that answers on a socket, so a refused credential, a rate limit and a reply
+that never arrives are all exercised here rather than discovered in production. No
+test ever holds a real credential: the environment is emptied around every one of
+them, and a test that wants an endpoint stands it up itself.
 
 The client typechecks and builds, and its scene document validates against the SDK's
 own schema and component catalog, so every asset id, component and field the code
@@ -159,10 +177,10 @@ carries a bearer token, an anonymous request is refused, a pipe pulled with a po
 forks a second world, and a payment left in **unknown** is reconciled by the client on
 the next heartbeat without being asked.
 
-The settlement-rail, currency and background-reconciliation work added in this round
-is covered by the service tests and by the client typecheck and build. It was not
-driven in a browser or an XR session on this machine, so nothing about how those
-panels look or feel on the table should be read as tested.
+The settlement-rail, currency and background-reconciliation work, and the model-route
+reporting added after it, are covered by the service tests and by the client typecheck
+and build. They were not driven in a browser or an XR session on this machine, so
+nothing about how those panels look or feel on the table should be read as tested.
 
 Live immersive evidence was **not** captured on this machine: the managed XR browser
 would not start alongside the browser already running here, so no claim about headset

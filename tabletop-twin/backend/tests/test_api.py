@@ -6,6 +6,7 @@ reaching into a shared singleton.
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -60,10 +61,8 @@ def test_logout_invalidates_the_token(client):
     assert client.get("/v1/me", headers=bearer).status_code == 401
 
 
-def test_health_says_which_planner_answered(client, monkeypatch):
-    monkeypatch.delenv("META_MODEL_BASE_URL", raising=False)
-    monkeypatch.delenv("LLM_BASE_URL", raising=False)
-    monkeypatch.delenv("OPENAI_COMPAT_BASE_URL", raising=False)
+def test_health_says_which_planner_answered(client):
+    # conftest has already emptied the credential variables this machine may hold.
     body = client.get("/v1/health").json()
     assert body["ok"] and body["planner"] in {"rules", "model"}
     assert body["paypal_configured"] is False
@@ -74,6 +73,40 @@ def test_health_says_which_planner_answered(client, monkeypatch):
     assert body["heartbeat_unwired"] == []
     # Which endpoints exist is reported by name; the keys themselves never leave the env.
     assert body["model_providers"] == []
+    assert body["model_routes"] == []
+    assert body["route"] == "rules"
+    assert body["route_is_measured"] is False
+
+
+def test_health_names_the_muse_route_it_would_use_without_calling_it(client, monkeypatch):
+    monkeypatch.setenv("MODEL_API_KEY", "super-secret-value")
+    body = client.get("/v1/health").json()
+    assert body["model_providers"] == ["muse"]
+    [route] = body["model_routes"]
+    assert route["provider"] == "muse"
+    assert route["model"] == "muse-spark-1.3"
+    assert route["host"] == "api.meta.ai"
+    assert route["assumed"] == ["base_url", "model"]
+    assert route["supplied_by"] == {"api_key": "MODEL_API_KEY", "base_url": "", "model": ""}
+    # Intended, not yet proven: no question has been put to it in this request.
+    assert body["route"] == "muse:muse-spark-1.3"
+    assert body["route_is_measured"] is False
+    assert "super-secret-value" not in json.dumps(body)
+
+
+def test_an_answer_names_the_route_that_produced_it(client, headers):
+    answer = client.post("/v1/ask", headers=headers, json={"intent": "will I run out by day 40"}).json()
+    assert answer["route"] == "rules"
+    assert answer["narration_route"] == "rules"
+
+
+def test_an_endpoint_that_never_answers_is_named_as_the_thing_that_failed(client, headers, monkeypatch):
+    monkeypatch.setenv("MODEL_API_KEY", "super-secret-value")
+    monkeypatch.setenv("META_MODEL_BASE_URL", "http://127.0.0.1:9/v1")
+    answer = client.post("/v1/ask", headers=headers, json={"intent": "will I run out by day 40"}).json()
+    assert answer["route"].startswith("rules (")
+    assert "127.0.0.1:9" in answer["route"]
+    assert "super-secret-value" not in json.dumps(answer)
 
 
 def test_world_arrives_ready_to_draw(client, headers):

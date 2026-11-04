@@ -19,6 +19,31 @@ rejected rather than displayed. When no model is configured, or the one configur
 is unreachable, the same tool choices come from a rule planner and the service
 reports which route it took. Nothing on the table depends on a model answering.
 
+## Talking to Muse
+
+Muse is Meta's Model API, and it documents its own shape: an OpenAI-compatible
+endpoint at `https://api.meta.ai/v1`, a default model of `muse-spark-1.3`, a key in
+`MODEL_API_KEY`. So a key is the only thing an operator has to supply for that route —
+the address and the model name are Meta's published values, and `/v1/health` says
+plainly which fields came from the environment and which were assumed.
+`META_MODEL_API_KEY`, `META_MODEL_BASE_URL` and `META_MODEL_NAME` override any of
+them. A generic OpenAI-compatible server has no published address, so it still has to
+name all three of itself, and a route with no key is no route at all.
+
+A refusal is answered with the semantics it actually has. A 401 or 403 means the
+credential was rejected and asking again only spends another request, so it is never
+retried. A 429 states how long to wait and gets exactly one more attempt after that
+wait, capped at two seconds, because a headset is not going to sit through an hour. A
+5xx is treated as transient and given the same single repair. Whatever the endpoint
+says back is flattened and truncated before it reaches a route string, and the key
+itself never does: a status line may name `MODEL_API_KEY`, never what is in it.
+
+Health reports the route it intends to use as *configured*, not as proven.
+`route_is_measured` stays false until something has actually been asked, because the
+environment can say what would be called and nothing more — and an answer's two halves
+are reported apart, since a model that chose the tool and then could not be trusted
+with the phrasing is a different fact from a model that never called.
+
 ## Supervision, not trust
 
 Spending limits, single-payment caps, rolling daily and monthly ceilings, a
@@ -114,6 +139,16 @@ python -m pytest
 ```
 
 Model and settlement credentials are read from the environment by name, and no value
-is kept in this repository. `TWIN_DB_PATH` says where the worlds live (`twin.db` in the working directory by
+is kept in this repository. Muse needs only a key, since its address and default model
+are Meta's published values; a generic endpoint has no published address and so must
+name all three itself. `TWIN_DB_PATH` says where the worlds live (`twin.db` in the working directory by
 default, which is why it is git-ignored), and `TWIN_ALLOW_ORIGINS` lists the client
 origins allowed to call it.
+
+`python -m pytest` spends nothing and reveals nothing. The credential variables are
+emptied around every test, so a suite run on a machine that happens to hold a real key
+never sends a request with it. The endpoints the tests do exercise — Muse and PayPal —
+are gateways the tests stand up on localhost, and they answer on a socket rather than
+as stubs precisely so the awkward failures can be provoked here instead of discovered
+in production: a refused credential that must not be asked twice, a rate limit that
+names a wait, and a reply that never arrives after the work was done.

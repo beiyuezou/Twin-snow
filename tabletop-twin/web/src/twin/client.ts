@@ -137,6 +137,23 @@ export interface Verdict {
   error?: string;
 }
 
+/**
+ * One model endpoint, described from the environment alone — no request was made
+ * to produce this. `supplied_by` names the variables the operator set and
+ * `assumed` the fields that fell back to a published default, which is how a table
+ * tells an endpoint it was configured with from one it is guessing at.
+ */
+export interface ModelRoute {
+  provider: string;
+  model: string;
+  host: string;
+  endpoint: string;
+  timeout_sec: number;
+  supplied_by: Record<string, string>;
+  assumed: string[];
+  preferred: boolean;
+}
+
 const BASE = (import.meta.env.VITE_TWIN_API ?? 'http://localhost:8000').replace(/\/+$/u, '');
 
 /** The only gesture string the payment state machine will settle with. */
@@ -236,7 +253,9 @@ export const twinApi = {
     persona: string;
     planner: string;
     route: string;
+    route_is_measured: boolean;
     model_providers: string[];
+    model_routes: ModelRoute[];
     heartbeat_steps: string[];
     heartbeat_unwired: string[];
     paypal_configured: boolean;
@@ -254,7 +273,7 @@ export const twinApi = {
   tick: (days: number, final_of_day: boolean) =>
     post<{ day: number; captions: Caption[]; scene: ScenePayload }>('/v1/tick', { days, final_of_day }),
   ask: (intent: string) =>
-    post<{ said: string; focus: string; scene: ScenePayload }>('/v1/ask', { intent }),
+    post<{ said: string; focus: string; route: string; narration_route: string; scene: ScenePayload }>('/v1/ask', { intent }),
   propose: (calls: unknown[]) => post<{ results: Record<string, unknown>[]; scene: ScenePayload }>('/v1/tools', { calls }),
   approve: (action_id: string, gesture: string) =>
     post<{ action_id: string; state: string; error?: string }>('/v1/approve', { action_id, gesture }),

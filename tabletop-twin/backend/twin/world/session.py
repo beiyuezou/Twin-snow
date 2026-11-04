@@ -576,6 +576,10 @@ class Session:
     def ask(self, intent: str) -> dict:
         context = self.planner_context()
         calls = self.planner.plan(intent, context)
+        # The two steps can take different routes: a model may choose the tool and
+        # then refuse to phrase the answer. Recording only the second would hide
+        # that the first was answered at all.
+        plan_route = self.planner_route()
         results = []
         for call in calls:
             try:
@@ -584,9 +588,15 @@ class Session:
                 results.append({"error": f"unknown event '{exc.args[0]}'"})
         narration = self.planner.narrate(intent, results, context)
         self.last_speech = narration
-        self.record("intent", {"intent": intent, "route": getattr(self.planner, "last_route", self.planner.name),
+        self.record("intent", {"intent": intent, "route": plan_route,
+                               "narration_route": self.planner_route(),
                                "calls": [c.tool for c in calls]})
-        return {"intent": intent, "calls": [c.tool for c in calls], "results": results, "said": narration, "focus": self.focus}
+        return {"intent": intent, "calls": [c.tool for c in calls], "results": results, "said": narration,
+                "focus": self.focus, "route": plan_route, "narration_route": self.planner_route()}
+
+    def planner_route(self) -> str:
+        """Who answered last, said the way the endpoint reported it."""
+        return getattr(self.planner, "last_route", "") or self.planner.name
 
     # ------------------------------------------------------------------ ledger
 

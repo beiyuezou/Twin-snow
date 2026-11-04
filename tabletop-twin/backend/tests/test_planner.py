@@ -9,18 +9,21 @@ import pytest
 
 from twin.planner.model import (
     MUSE,
+    MUSE_BASE_URL,
+    MUSE_MODEL,
     ModelConfig,
     ModelPlanner,
     NumberFabrication,
     number_tokens,
     providers_configured,
     providers_from_env,
+    route_details,
 )
 from twin.planner.rules import RulePlanner
 from twin.planner.tools import REGISTRY, ToolError, parse_calls
 
 PROVIDER_VARS = (
-    "META_MODEL_BASE_URL", "META_MODEL_API_KEY", "META_MODEL_NAME",
+    "META_MODEL_BASE_URL", "META_MODEL_API_KEY", "META_MODEL_NAME", "MODEL_API_KEY",
     "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL",
     "OPENAI_COMPAT_BASE_URL", "OPENAI_COMPAT_API_KEY", "OPENAI_COMPAT_MODEL",
 )
@@ -202,15 +205,33 @@ def test_the_generic_endpoint_is_used_when_muse_is_absent(clean_env):
     assert planner.config.base_url == "https://other.example/v1"
 
 
-def test_an_endpoint_with_nothing_in_the_environment_is_no_endpoint_at_all(clean_env):
+def test_a_generic_endpoint_without_an_address_is_not_silently_tried(clean_env):
+    clean_env.setenv("LLM_API_KEY", "other-key")
     assert providers_from_env() == []
     assert ModelPlanner.from_env() is None
 
 
-def test_a_half_configured_endpoint_is_not_silently_tried(clean_env):
-    clean_env.setenv("META_MODEL_BASE_URL", "https://muse.example/v1")
-    clean_env.setenv("META_MODEL_API_KEY", "muse-key")  # no model name
-    assert providers_configured() == []
+def test_a_muse_key_alone_is_a_whole_endpoint_because_meta_publishes_the_rest(clean_env):
+    clean_env.setenv("MODEL_API_KEY", "muse-key")
+    planner = ModelPlanner.from_env()
+    assert planner.provider == MUSE
+    assert planner.config.base_url == MUSE_BASE_URL
+    assert planner.config.model == MUSE_MODEL
+    # Which words came from the operator, and which from Meta's own documentation.
+    assert planner.config.supplied == {"api_key": "MODEL_API_KEY", "base_url": "", "model": ""}
+    assert planner.route == f"muse:{MUSE_MODEL}"
+
+
+def test_the_documented_variable_and_the_project_one_are_the_same_key_slot(clean_env):
+    clean_env.setenv("MODEL_API_KEY", "second-choice")
+    clean_env.setenv("META_MODEL_API_KEY", "first-choice")
+    config = providers_from_env()[0]
+    assert config.api_key == "first-choice"
+    assert config.supplied["api_key"] == "META_MODEL_API_KEY"
+
+
+def test_an_endpoint_with_nothing_in_the_environment_is_no_endpoint_at_all(clean_env):
+    assert providers_from_env() == []
     assert ModelPlanner.from_env() is None
 
 
@@ -222,11 +243,34 @@ def test_the_provider_list_never_carries_a_key(clean_env):
     assert not any("super-secret" in str(name) for name in providers_configured())
 
 
+def test_a_route_report_says_what_would_be_called_without_calling_it(clean_env):
+    clean_env.setenv("MODEL_API_KEY", "super-secret-value")
+    [route] = route_details()
+    assert route["provider"] == MUSE
+    assert route["host"] == "api.meta.ai"
+    assert route["endpoint"] == f"{MUSE_BASE_URL}/chat/completions"
+    assert route["supplied_by"] == {"api_key": "MODEL_API_KEY", "base_url": "", "model": ""}
+    assert route["assumed"] == ["base_url", "model"]
+    assert route["preferred"] is True
+    assert "super-secret-value" not in json.dumps(route)
+
+
+def test_an_explicit_address_and_model_leave_nothing_assumed(clean_env):
+    clean_env.setenv("META_MODEL_BASE_URL", "https://muse.example/v1/")
+    clean_env.setenv("META_MODEL_API_KEY", "muse-key")
+    clean_env.setenv("META_MODEL_NAME", "muse-wonder-1.0")
+    [route] = route_details()
+    assert route["assumed"] == []
+    assert route["host"] == "muse.example"
+    assert route["endpoint"] == "https://muse.example/v1/chat/completions"
+
+
 def test_a_muse_reply_that_invents_numbers_is_still_refused_in_favour_of_rules():
     results = [{"forecast": {"pinch_day": 77, "shortfall_day": None, "median_low_dollars": 255.0,
                              "dry_run_percent": 12, "runs": 2000}}]
     opener = FakeOpener({"choices": [{"message": {"content": "You will need about 9,000 dollars by Friday."}}]})
     planner = ModelPlanner(muse_config(), opener=opener)
     said = planner.narrate("what now", results)
-    assert planner.last_route == "rules (narration fell back)"
+    assert planner.last_route.startswith("rules (narration fell back")
+    assert "9000" in planner.last_route
     assert "9,000" not in said and "255" in said

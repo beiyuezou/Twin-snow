@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from twin.domain.events import event_from_dict
 from twin.payments.machine import IllegalTransition, TERMINAL
 from twin.payments.paypal import PayPalConfig, PayPalTransport, SandboxTransport
-from twin.planner.model import providers_configured
+from twin.planner.model import providers_configured, route_details
 from twin.planner.tools import ToolError, parse_calls
 from twin.payments.rails import SANDBOX_RAIL, load_catalog
 from twin.store import Store
@@ -237,12 +237,18 @@ def me(user_id: str = Depends(current_user)) -> dict:
 @app.get("/v1/health")
 def health() -> dict:
     s = demo_session()
+    spoken = getattr(s.planner, "last_route", "")
     return {
         "ok": True,
         "persona": s.persona.name,
         "planner": s.planner.name,
-        "route": getattr(s.planner, "last_route", s.planner.name),
+        "route": spoken or getattr(s.planner, "route", s.planner.name),
+        # An unspoken route is an intention read out of the environment, not a
+        # measurement: nobody has been asked anything yet, so nothing proves the
+        # endpoint answers.
+        "route_is_measured": bool(spoken),
         "model_providers": providers_configured(),
+        "model_routes": route_details(),
         "heartbeat_steps": [step.slug for step in s.persona.steps],
         "heartbeat_unwired": unwired(s),
         "paypal_configured": PayPalConfig.from_env() is not None,
