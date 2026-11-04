@@ -1,8 +1,13 @@
 """Durable state for every twin: accounts, worlds, payments and the action ledger.
 
-SQLite from the standard library, so an account survives a restart and a twin can
-remember what it did. One connection guarded by one lock: FastAPI runs sync
+PostgreSQL, so a world outlives the process that made it, a second worker can read what
+the first wrote, and a row that breaks the shape of its table is refused by the database
+rather than noticed later. One connection guarded by one lock: FastAPI runs sync
 endpoints on a thread pool, and this is the only module allowed to write.
+
+The address is `TWIN_DB_URL`, like `postgresql://twin@127.0.0.1:5432/twin`. The optional
+`TWIN_DB_SCHEMA` names a schema to keep every table inside, which is how one shared
+server gives a test a database of its own without asking for another port.
 """
 
 from __future__ import annotations
@@ -11,12 +16,15 @@ import hashlib
 import hmac
 import json
 import os
-import sqlite3
 import threading
 import time
 import uuid
 from dataclasses import replace
-from pathlib import Path
+
+import psycopg
+from psycopg import sql
+from psycopg.errors import UniqueViolation
+from psycopg.rows import dict_row
 
 from twin.domain.events import CashEvent, Direction, Kind, Ledger
 from twin.domain.learning import Outcome, Prediction
@@ -24,125 +32,186 @@ from twin.payments.machine import PaymentRecord
 from twin.policy.engine import Policy, policy_from_dict
 
 TOKEN_TTL_SEC = 30 * 24 * 60 * 60
+CONNECT_TIMEOUT_SEC = 10
 _SCRYPT = {"n": 2**14, "r": 8, "p": 1}
 # What a world that nobody has claimed yet calls itself. It is a placeholder in the
 # same sense the email slot is: both are replaced the first time a person signs up.
 ANONYMOUS_NAME = "this table"
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS app_user (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  created_at REAL NOT NULL,
-  pw_salt TEXT NOT NULL DEFAULT '',
-  pw_hash TEXT NOT NULL DEFAULT '',
-  device_key TEXT
-);
-CREATE TABLE IF NOT EXISTS access_token (
-  token_hash TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  created_at REAL NOT NULL,
-  expires_at REAL NOT NULL
-);
-CREATE TABLE IF NOT EXISTS world (
-  user_id TEXT PRIMARY KEY,
-  persona_id TEXT NOT NULL,
-  day INTEGER NOT NULL DEFAULT 0,
-  horizon_days INTEGER NOT NULL,
-  runs INTEGER NOT NULL,
-  opening_balance_cents INTEGER NOT NULL,
-  currency TEXT NOT NULL DEFAULT 'USD',
-  country TEXT NOT NULL DEFAULT '',
-  rail TEXT NOT NULL DEFAULT 'sandbox',
-  policy_json TEXT NOT NULL,
-  focus TEXT NOT NULL DEFAULT '',
-  last_speech TEXT NOT NULL DEFAULT '',
-  tested_on_day INTEGER NOT NULL DEFAULT -1,
-  updated_at REAL NOT NULL
-);
-CREATE TABLE IF NOT EXISTS cash_event (
-  user_id TEXT NOT NULL,
-  id TEXT NOT NULL,
-  label TEXT NOT NULL,
-  kind TEXT NOT NULL,
-  direction TEXT NOT NULL,
-  amount_cents INTEGER NOT NULL,
-  due_day INTEGER NOT NULL,
-  counterparty TEXT NOT NULL DEFAULT '',
-  country TEXT NOT NULL DEFAULT '',
-  currency TEXT NOT NULL DEFAULT '',
-  recurring_every_days INTEGER,
-  occurrences INTEGER NOT NULL DEFAULT 1,
-  late_fee_cents INTEGER NOT NULL DEFAULT 0,
-  lateness_json TEXT NOT NULL DEFAULT '[]',
-  source TEXT NOT NULL DEFAULT 'seed',
-  PRIMARY KEY (user_id, id)
-);
-CREATE TABLE IF NOT EXISTS prediction (
-  user_id TEXT NOT NULL,
-  id TEXT NOT NULL,
-  subject TEXT NOT NULL,
-  statement TEXT NOT NULL,
-  probability REAL NOT NULL,
-  made_on_day INTEGER NOT NULL,
-  resolves_on_day INTEGER NOT NULL,
-  outcome TEXT NOT NULL,
-  tool TEXT NOT NULL,
-  check_json TEXT NOT NULL DEFAULT '{}',
-  PRIMARY KEY (user_id, id)
-);
-CREATE TABLE IF NOT EXISTS branch (
-  user_id TEXT NOT NULL,
-  key TEXT NOT NULL,
-  label TEXT NOT NULL,
-  cancelled_json TEXT NOT NULL DEFAULT '[]',
-  chase_json TEXT NOT NULL DEFAULT '[]',
-  shifted_json TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (user_id, key)
-);
-CREATE TABLE IF NOT EXISTS payment (
-  user_id TEXT NOT NULL,
-  idempotency_key TEXT NOT NULL,
-  action_id TEXT NOT NULL,
-  verb TEXT NOT NULL DEFAULT 'pay_bill',
-  direction TEXT NOT NULL DEFAULT 'out',
-  amount_cents INTEGER NOT NULL,
-  currency TEXT NOT NULL DEFAULT 'USD',
-  rail TEXT NOT NULL DEFAULT 'sandbox',
-  fee_cents INTEGER NOT NULL DEFAULT 0,
-  recipient TEXT NOT NULL DEFAULT '',
-  country TEXT NOT NULL DEFAULT '',
-  state TEXT NOT NULL,
-  attempt INTEGER NOT NULL DEFAULT 0,
-  provider_ref TEXT,
-  verified_outcome TEXT,
-  settled_day INTEGER,
-  history_json TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY (user_id, idempotency_key)
-);
-CREATE TABLE IF NOT EXISTS action_log (
-  seq INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id TEXT NOT NULL,
-  day INTEGER NOT NULL,
-  kind TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  created_at REAL NOT NULL
-);
-CREATE TABLE IF NOT EXISTS connection (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  key_hash TEXT NOT NULL,
-  created_at REAL NOT NULL
-);
-CREATE INDEX IF NOT EXISTS log_user ON action_log (user_id, seq);
-CREATE INDEX IF NOT EXISTS token_user ON access_token (user_id);
-"""
+TABLES = (
+    """
+    CREATE TABLE IF NOT EXISTS app_user (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      created_at DOUBLE PRECISION NOT NULL,
+      pw_salt TEXT NOT NULL DEFAULT '',
+      pw_hash TEXT NOT NULL DEFAULT '',
+      device_key TEXT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS access_token (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      created_at DOUBLE PRECISION NOT NULL,
+      expires_at DOUBLE PRECISION NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS world (
+      user_id TEXT PRIMARY KEY,
+      persona_id TEXT NOT NULL,
+      day INTEGER NOT NULL DEFAULT 0,
+      horizon_days INTEGER NOT NULL,
+      runs INTEGER NOT NULL,
+      opening_balance_cents BIGINT NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'USD',
+      country TEXT NOT NULL DEFAULT '',
+      rail TEXT NOT NULL DEFAULT 'sandbox',
+      policy_json TEXT NOT NULL,
+      focus TEXT NOT NULL DEFAULT '',
+      last_speech TEXT NOT NULL DEFAULT '',
+      tested_on_day INTEGER NOT NULL DEFAULT -1,
+      updated_at DOUBLE PRECISION NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS cash_event (
+      user_id TEXT NOT NULL,
+      id TEXT NOT NULL,
+      label TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      amount_cents BIGINT NOT NULL,
+      due_day INTEGER NOT NULL,
+      counterparty TEXT NOT NULL DEFAULT '',
+      country TEXT NOT NULL DEFAULT '',
+      currency TEXT NOT NULL DEFAULT '',
+      recurring_every_days INTEGER,
+      occurrences INTEGER NOT NULL DEFAULT 1,
+      late_fee_cents BIGINT NOT NULL DEFAULT 0,
+      lateness_json TEXT NOT NULL DEFAULT '[]',
+      source TEXT NOT NULL DEFAULT 'seed',
+      PRIMARY KEY (user_id, id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS prediction (
+      user_id TEXT NOT NULL,
+      id TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      statement TEXT NOT NULL,
+      probability DOUBLE PRECISION NOT NULL,
+      made_on_day INTEGER NOT NULL,
+      resolves_on_day INTEGER NOT NULL,
+      outcome TEXT NOT NULL,
+      tool TEXT NOT NULL,
+      check_json TEXT NOT NULL DEFAULT '{}',
+      PRIMARY KEY (user_id, id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS branch (
+      user_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      label TEXT NOT NULL,
+      cancelled_json TEXT NOT NULL DEFAULT '[]',
+      chase_json TEXT NOT NULL DEFAULT '[]',
+      shifted_json TEXT NOT NULL DEFAULT '[]',
+      PRIMARY KEY (user_id, key)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS payment (
+      user_id TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL,
+      action_id TEXT NOT NULL,
+      verb TEXT NOT NULL DEFAULT 'pay_bill',
+      direction TEXT NOT NULL DEFAULT 'out',
+      amount_cents BIGINT NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'USD',
+      rail TEXT NOT NULL DEFAULT 'sandbox',
+      fee_cents BIGINT NOT NULL DEFAULT 0,
+      recipient TEXT NOT NULL DEFAULT '',
+      country TEXT NOT NULL DEFAULT '',
+      state TEXT NOT NULL,
+      attempt INTEGER NOT NULL DEFAULT 0,
+      provider_ref TEXT,
+      verified_outcome TEXT,
+      settled_day INTEGER,
+      history_json TEXT NOT NULL DEFAULT '[]',
+      PRIMARY KEY (user_id, idempotency_key)
+    )
+    """,
+    # An audit trail that numbers its own rows is the one place a generated sequence is
+    # worth more than a key someone could learn to guess.
+    """
+    CREATE TABLE IF NOT EXISTS action_log (
+      seq BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      day INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      created_at DOUBLE PRECISION NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS connection (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      key_hash TEXT NOT NULL,
+      created_at DOUBLE PRECISION NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS log_user ON action_log (user_id, seq)",
+    "CREATE INDEX IF NOT EXISTS token_user ON access_token (user_id)",
+)
+
+# Columns a database written before they existed does not have. Money is in cents, so
+# it is BIGINT: a 32-bit INTEGER runs out at about twenty-one million dollars.
+ADDED_COLUMNS = {
+    "app_user": {"device_key": "TEXT"},
+    "world": {"currency": "TEXT NOT NULL DEFAULT 'USD'", "country": "TEXT NOT NULL DEFAULT ''",
+              "rail": "TEXT NOT NULL DEFAULT 'sandbox'"},
+    "cash_event": {"country": "TEXT NOT NULL DEFAULT ''", "currency": "TEXT NOT NULL DEFAULT ''"},
+    "payment": {
+        "currency": "TEXT NOT NULL DEFAULT 'USD'",
+        "rail": "TEXT NOT NULL DEFAULT 'sandbox'",
+        "fee_cents": "BIGINT NOT NULL DEFAULT 0",
+        "country": "TEXT NOT NULL DEFAULT ''",
+    },
+}
 
 
-def db_path() -> str:
-    return os.environ.get("TWIN_DB_PATH", "twin.db")
+def db_url() -> str:
+    url = os.environ.get("TWIN_DB_URL", "").strip()
+    if not url:
+        raise RuntimeError(
+            "TWIN_DB_URL is not set. This service keeps its worlds in PostgreSQL, so it"
+            " needs a connection string such as postgresql://twin@127.0.0.1:5432/twin"
+        )
+    return url
+
+
+def db_schema() -> str:
+    return os.environ.get("TWIN_DB_SCHEMA", "").strip()
+
+
+def _checked(url: str) -> str:
+    """A connection string, or a message that says what was actually wrong with it.
+
+    The one mistake worth expecting is an old file path, because this service kept its
+    worlds in a SQLite file until it did not.
+    """
+    if url.endswith(".db") or url == ":memory:":
+        raise ValueError(
+            "that is a file, not a server: TWIN_DB_URL wants a postgresql:// connection string"
+        )
+    if not url.startswith(("postgresql://", "postgres://")):
+        raise ValueError(f"not a PostgreSQL connection string: {url!r}")
+    return url
 
 
 def _hash_password(password: str, salt: bytes) -> str:
@@ -154,52 +223,114 @@ def _secret_hash(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-class Store:
-    def __init__(self, path: str | None = None) -> None:
-        self.path = path or db_path()
-        if self.path != ":memory:":
-            parent = Path(self.path).expanduser().resolve().parent
-            parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(self.path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._lock = threading.Lock()
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.executescript(SCHEMA)
-        self._migrate()
+def schema_name(prefix: str = "twin_temp_") -> str:
+    """A schema name no other run will ask for, in characters an unquoted name may hold."""
+    return f"{prefix}{uuid.uuid4().hex}"
 
-    def _migrate(self) -> None:
+
+def _connect(url: str) -> psycopg.Connection:
+    return psycopg.connect(url, row_factory=dict_row, autocommit=True,
+                           connect_timeout=CONNECT_TIMEOUT_SEC, application_name="tabletop-twin")
+
+
+def drop_schema(name: str, url: str | None = None) -> None:
+    """Remove a schema and everything in it, for a database that was only ever temporary."""
+    conn = _connect(_checked(url if url is not None else db_url()))
+    try:
+        conn.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(name)))
+    finally:
+        conn.close()
+
+
+class Store:
+    def __init__(self, url: str | None = None, schema: str | None = None) -> None:
+        self.url = _checked(url if url is not None else db_url())
+        self.schema = schema if schema is not None else db_schema()
+        self._lock = threading.Lock()
+        self._conn: psycopg.Connection | None = None
+        self._temporary = False
+        self._open()
+
+    @classmethod
+    def temporary(cls) -> "Store":
+        """A database of its own inside a shared server, dropped by close().
+
+        This is what an in-process database was for: a test wants a world nobody else
+        can see, and nothing to set up. A schema is the smallest thing a server will
+        hand over for that, and it goes away afterwards instead of waiting to trip the
+        next run.
+        """
+        box = cls(schema=schema_name())
+        box._temporary = True
+        return box
+
+    # ------------------------------------------------------------------ plumbing
+
+    def _open(self) -> None:
+        conn = _connect(self.url)
+        if self.schema:
+            conn.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(self.schema)))
+            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(self.schema)))
+        for statement in TABLES:
+            conn.execute(statement)
+        self._migrate(conn)
+        self._conn = conn
+
+    def _migrate(self, conn: psycopg.Connection) -> None:
         """Give a database written before these columns existed the columns it lacks.
 
-        SQLite cannot diff a schema, so each added column is declared once here.
+        Each added column is declared once, here, and applied only where it is missing,
+        so an old database is brought forward by opening it rather than by a script
+        somebody has to remember to run first.
         """
-        wanted = {
-            "app_user": {"device_key": "TEXT"},
-            "world": {"currency": "TEXT NOT NULL DEFAULT 'USD'", "country": "TEXT NOT NULL DEFAULT ''",
-                      "rail": "TEXT NOT NULL DEFAULT 'sandbox'"},
-            "cash_event": {"country": "TEXT NOT NULL DEFAULT ''", "currency": "TEXT NOT NULL DEFAULT ''"},
-            "payment": {
-                "currency": "TEXT NOT NULL DEFAULT 'USD'",
-                "rail": "TEXT NOT NULL DEFAULT 'sandbox'",
-                "fee_cents": "INTEGER NOT NULL DEFAULT 0",
-                "country": "TEXT NOT NULL DEFAULT ''",
-            },
-        }
-        with self._lock:
-            for table, columns in wanted.items():
-                have = {row[1] for row in self._conn.execute(f"PRAGMA table_info({table})")}
-                for name, declaration in columns.items():
-                    if name not in have:
-                        self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
-            # Created here rather than in the script above, because a database written
+        for table, columns in ADDED_COLUMNS.items():
+            have = {row["column_name"] for row in conn.execute(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE table_schema = current_schema() AND table_name = %s", (table,)
+            )}
+            for name, declaration in columns.items():
+                if name not in have:
+                    conn.execute(sql.SQL("ALTER TABLE {} ADD COLUMN {} {}").format(
+                        sql.Identifier(table), sql.Identifier(name), sql.SQL(declaration)))
+            # Created here rather than in the list above, because a database written
             # before the column existed cannot be indexed on it until it has it. One
             # device must answer to one account: a second row would be a second world
             # for the same headset, opened by whichever request happened to arrive first.
-            self._conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS user_device ON app_user (device_key)")
-            self._conn.commit()
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS user_device ON app_user (device_key)")
+
+    def _do(self, work):
+        """Run one unit of work against the server, under the lock.
+
+        A database at the other end of a socket can be restarted while this service is
+        running. A write that was in flight when it went away has already been rolled
+        back there, so this call fails rather than repeating itself: the dead connection
+        is dropped, and the next one to ask opens a fresh one.
+        """
+        with self._lock:
+            if self._conn is None or self._conn.closed:
+                self._open()
+            try:
+                return work(self._conn)
+            except (psycopg.OperationalError, psycopg.InterfaceError):
+                if self._conn is not None and not self._conn.closed:
+                    self._conn.rollback()
+                self._close_quietly()
+                raise
+
+    def _close_quietly(self) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
 
     def close(self) -> None:
         with self._lock:
-            self._conn.close()
+            temporary, name = self._temporary, self.schema
+            self._close_quietly()
+        if temporary:
+            drop_schema(name, self.url)
 
     # ---------------------------------------------------------------- accounts
 
@@ -209,15 +340,15 @@ class Store:
             raise ValueError("needs a valid email and a password of at least 8 characters")
         salt = os.urandom(16)
         user_id = uuid.uuid4().hex
-        with self._lock:
-            try:
-                self._conn.execute(
-                    "INSERT INTO app_user (id, email, name, created_at, pw_salt, pw_hash) VALUES (?,?,?,?,?,?)",
-                    (user_id, email, name.strip() or email.split("@")[0], time.time(), salt.hex(), _hash_password(password, salt)),
-                )
-                self._conn.commit()
-            except sqlite3.IntegrityError as exc:
-                raise ValueError("an account already uses that email") from exc
+        try:
+            self._do(lambda conn: conn.execute(
+                "INSERT INTO app_user (id, email, name, created_at, pw_salt, pw_hash)"
+                " VALUES (%s,%s,%s,%s,%s,%s)",
+                (user_id, email, name.strip() or email.split("@")[0], time.time(), salt.hex(),
+                 _hash_password(password, salt)),
+            ))
+        except UniqueViolation as exc:
+            raise ValueError("an account already uses that email") from exc
         return user_id
 
     def create_anonymous_user(self, device_key: str) -> str:
@@ -229,31 +360,32 @@ class Store:
         """
         key = _secret_hash(device_key)
         user_id = uuid.uuid4().hex
-        with self._lock:
-            try:
-                self._conn.execute(
-                    "INSERT INTO app_user (id, email, name, created_at, pw_salt, pw_hash, device_key)"
-                    " VALUES (?,?,?,?,?,?,?)",
-                    (user_id, f"device-{user_id}@device.invalid", ANONYMOUS_NAME, time.time(), "", "", key),
-                )
-                self._conn.commit()
-            except sqlite3.IntegrityError:
-                # A second first visit from one device races the first. Whichever
-                # insert landed owns the world, so the loser answers with that account
-                # instead of opening a table nobody will ever see.
-                row = self._conn.execute("SELECT id FROM app_user WHERE device_key = ?", (key,)).fetchone()
-                if row is None:
-                    raise
-                user_id = row["id"]
-        return user_id
+
+        def work(conn):
+            landed = conn.execute(
+                "INSERT INTO app_user (id, email, name, created_at, pw_salt, pw_hash, device_key)"
+                " VALUES (%s,%s,%s,%s,'','',%s)"
+                " ON CONFLICT (device_key) DO NOTHING RETURNING id",
+                (user_id, f"device-{user_id}@device.invalid", ANONYMOUS_NAME, time.time(), key),
+            ).fetchone()
+            if landed is not None:
+                return landed["id"]
+            # A second first visit from one device raced the first, and the unique index
+            # chose a winner. Whichever insert landed owns the world, so the loser
+            # answers with that account instead of opening a table nobody will ever see.
+            holder = conn.execute("SELECT id FROM app_user WHERE device_key = %s", (key,)).fetchone()
+            if holder is None:
+                raise RuntimeError("the device account neither landed nor already existed")
+            return holder["id"]
+
+        return self._do(work)
 
     def user_for_device(self, raw: str | None) -> str | None:
         if not raw:
             return None
-        with self._lock:
-            row = self._conn.execute(
-                "SELECT id FROM app_user WHERE device_key = ?", (_secret_hash(raw),)
-            ).fetchone()
+        row = self._do(lambda conn: conn.execute(
+            "SELECT id FROM app_user WHERE device_key = %s", (_secret_hash(raw),)
+        ).fetchone())
         return row["id"] if row else None
 
     def bind_device(self, user_id: str, raw: str) -> bool:
@@ -263,16 +395,18 @@ class Store:
         orphan the world it opened, and no sign-in should do that without being asked.
         """
         key = _secret_hash(raw)
-        with self._lock:
-            holder = self._conn.execute("SELECT id FROM app_user WHERE device_key = ?", (key,)).fetchone()
+
+        def work(conn):
+            holder = conn.execute("SELECT id FROM app_user WHERE device_key = %s", (key,)).fetchone()
             if holder is not None:
                 return holder["id"] == user_id
             try:
-                self._conn.execute("UPDATE app_user SET device_key = ? WHERE id = ?", (key, user_id))
-                self._conn.commit()
-            except sqlite3.IntegrityError:
+                conn.execute("UPDATE app_user SET device_key = %s WHERE id = %s", (key, user_id))
+            except UniqueViolation:
                 return False
             return True
+
+        return self._do(work)
 
     def claim_account(self, user_id: str, email: str, name: str, password: str) -> None:
         """Put a real email and password on the account a device already owns.
@@ -284,21 +418,18 @@ class Store:
         if "@" not in email or len(password) < 8:
             raise ValueError("needs a valid email and a password of at least 8 characters")
         salt = os.urandom(16)
-        with self._lock:
-            try:
-                self._conn.execute(
-                    "UPDATE app_user SET email = ?, name = ?, pw_salt = ?, pw_hash = ? WHERE id = ?",
-                    (email, name.strip() or email.split("@")[0], salt.hex(), _hash_password(password, salt), user_id),
-                )
-                self._conn.commit()
-            except sqlite3.IntegrityError as exc:
-                raise ValueError("an account already uses that email") from exc
+        try:
+            self._do(lambda conn: conn.execute(
+                "UPDATE app_user SET email = %s, name = %s, pw_salt = %s, pw_hash = %s WHERE id = %s",
+                (email, name.strip() or email.split("@")[0], salt.hex(), _hash_password(password, salt), user_id),
+            ))
+        except UniqueViolation as exc:
+            raise ValueError("an account already uses that email") from exc
 
     def verify_password(self, email: str, password: str) -> str | None:
-        with self._lock:
-            row = self._conn.execute(
-                "SELECT id, pw_salt, pw_hash FROM app_user WHERE email = ?", (email.strip().lower(),)
-            ).fetchone()
+        row = self._do(lambda conn: conn.execute(
+            "SELECT id, pw_salt, pw_hash FROM app_user WHERE email = %s", (email.strip().lower(),)
+        ).fetchone())
         if row is None:
             # Spend the same work either way, so a missing account answers as slowly
             # as a wrong password.
@@ -313,34 +444,33 @@ class Store:
         return row["id"]
 
     def user_name(self, user_id: str) -> str:
-        with self._lock:
-            row = self._conn.execute("SELECT name, email FROM app_user WHERE id = ?", (user_id,)).fetchone()
+        row = self._do(lambda conn: conn.execute(
+            "SELECT name, email FROM app_user WHERE id = %s", (user_id,)
+        ).fetchone())
         return (row["name"] if row else "you") or "you"
 
     def has_password(self, user_id: str) -> bool:
         """Whether anybody has claimed this world with an email and a password."""
-        with self._lock:
-            row = self._conn.execute("SELECT pw_hash FROM app_user WHERE id = ?", (user_id,)).fetchone()
+        row = self._do(lambda conn: conn.execute(
+            "SELECT pw_hash FROM app_user WHERE id = %s", (user_id,)
+        ).fetchone())
         return bool(row and row["pw_hash"])
 
     def issue_token(self, user_id: str) -> str:
         raw = uuid.uuid4().hex + uuid.uuid4().hex
         now = time.time()
-        with self._lock:
-            self._conn.execute(
-                "INSERT INTO access_token (token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)",
-                (_secret_hash(raw), user_id, now, now + TOKEN_TTL_SEC),
-            )
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "INSERT INTO access_token (token_hash, user_id, created_at, expires_at) VALUES (%s,%s,%s,%s)",
+            (_secret_hash(raw), user_id, now, now + TOKEN_TTL_SEC),
+        ))
         return raw
 
     def user_for_token(self, raw: str | None) -> str | None:
         if not raw:
             return None
-        with self._lock:
-            row = self._conn.execute(
-                "SELECT user_id, expires_at FROM access_token WHERE token_hash = ?", (_secret_hash(raw),)
-            ).fetchone()
+        row = self._do(lambda conn: conn.execute(
+            "SELECT user_id, expires_at FROM access_token WHERE token_hash = %s", (_secret_hash(raw),)
+        ).fetchone())
         if row is None or row["expires_at"] < time.time():
             return None
         return row["user_id"]
@@ -348,29 +478,35 @@ class Store:
     def revoke_token(self, raw: str | None) -> None:
         if not raw:
             return
-        with self._lock:
-            self._conn.execute("DELETE FROM access_token WHERE token_hash = ?", (_secret_hash(raw),))
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "DELETE FROM access_token WHERE token_hash = %s", (_secret_hash(raw),)
+        ))
 
     # ------------------------------------------------------------------ worlds
 
     def create_world(self, user_id: str, ledger: Ledger, policy: Policy) -> None:
         now = time.time()
-        with self._lock:
-            self._conn.execute(
-                "INSERT INTO world (user_id, persona_id, day, horizon_days, runs, opening_balance_cents,"
-                " currency, country, policy_json, focus, last_speech, tested_on_day, updated_at)"
-                " VALUES (?,?,0,90,2000,?,?,?,?, '', '', -1, ?)",
-                (user_id, ledger.persona_id, ledger.opening_balance_cents, ledger.currency,
-                 ledger.country, json.dumps(_policy_to_dict(policy)), now),
-            )
-            for event in ledger.events:
-                self._insert_event(user_id, event, source="seed")
-            self._conn.commit()
+
+        def work(conn):
+            # One transaction: a world whose events land without its row would be a
+            # table with a policy and no day, and nothing could tell it back apart.
+            with conn.transaction():
+                conn.execute(
+                    "INSERT INTO world (user_id, persona_id, day, horizon_days, runs, opening_balance_cents,"
+                    " currency, country, policy_json, focus, last_speech, tested_on_day, updated_at)"
+                    " VALUES (%s,%s,0,90,2000,%s,%s,%s,%s, '', '', -1, %s)",
+                    (user_id, ledger.persona_id, ledger.opening_balance_cents, ledger.currency,
+                     ledger.country, json.dumps(_policy_to_dict(policy)), now),
+                )
+                for event in ledger.events:
+                    self._insert_event(conn, user_id, event, source="seed")
+
+        self._do(work)
 
     def world_row(self, user_id: str) -> dict | None:
-        with self._lock:
-            row = self._conn.execute("SELECT * FROM world WHERE user_id = ?", (user_id,)).fetchone()
+        row = self._do(lambda conn: conn.execute(
+            "SELECT * FROM world WHERE user_id = %s", (user_id,)
+        ).fetchone())
         return dict(row) if row else None
 
     def policy_for(self, user_id: str, ledger: Ledger) -> Policy:
@@ -383,25 +519,21 @@ class Store:
 
     def save_world(self, user_id: str, *, day: int, horizon_days: int, runs: int, rail: str = "sandbox",
                    focus: str, last_speech: str, tested_on_day: int) -> None:
-        with self._lock:
-            self._conn.execute(
-                "UPDATE world SET day=?, horizon_days=?, runs=?, rail=?, focus=?, last_speech=?, tested_on_day=?,"
-                " updated_at=? WHERE user_id=?",
-                (day, horizon_days, runs, rail, focus, last_speech, tested_on_day, time.time(), user_id),
-            )
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "UPDATE world SET day=%s, horizon_days=%s, runs=%s, rail=%s, focus=%s, last_speech=%s,"
+            " tested_on_day=%s, updated_at=%s WHERE user_id=%s",
+            (day, horizon_days, runs, rail, focus, last_speech, tested_on_day, time.time(), user_id),
+        ))
 
     def set_opening_balance(self, user_id: str, cents: int) -> None:
-        with self._lock:
-            self._conn.execute("UPDATE world SET opening_balance_cents=? WHERE user_id=?", (cents, user_id))
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "UPDATE world SET opening_balance_cents=%s WHERE user_id=%s", (cents, user_id)
+        ))
 
     def put_policy(self, user_id: str, policy: Policy) -> None:
-        with self._lock:
-            self._conn.execute(
-                "UPDATE world SET policy_json=? WHERE user_id=?", (json.dumps(_policy_to_dict(policy)), user_id)
-            )
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "UPDATE world SET policy_json=%s WHERE user_id=%s", (json.dumps(_policy_to_dict(policy)), user_id)
+        ))
 
     def set_recipient_ceiling(self, user_id: str, recipient: str, cents: int | None) -> None:
         """Per-recipient caps live in the policy document, which is data, not code."""
@@ -415,18 +547,25 @@ class Store:
         else:
             ceilings[recipient] = int(cents)
         policy["recipient_ceilings_cents"] = ceilings
-        with self._lock:
-            self._conn.execute("UPDATE world SET policy_json=? WHERE user_id=?", (json.dumps(policy), user_id))
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "UPDATE world SET policy_json=%s WHERE user_id=%s", (json.dumps(policy), user_id)
+        ))
 
     # ------------------------------------------------------------------ events
 
-    def _insert_event(self, user_id: str, event: CashEvent, source: str) -> None:
-        self._conn.execute(
-            "INSERT OR REPLACE INTO cash_event (user_id, id, label, kind, direction, amount_cents, due_day,"
+    def _insert_event(self, conn: psycopg.Connection, user_id: str, event: CashEvent, source: str) -> None:
+        conn.execute(
+            "INSERT INTO cash_event (user_id, id, label, kind, direction, amount_cents, due_day,"
             " counterparty, country, currency, recurring_every_days, occurrences, late_fee_cents,"
             " lateness_json, source)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            " ON CONFLICT (user_id, id) DO UPDATE SET"
+            " label = EXCLUDED.label, kind = EXCLUDED.kind, direction = EXCLUDED.direction,"
+            " amount_cents = EXCLUDED.amount_cents, due_day = EXCLUDED.due_day,"
+            " counterparty = EXCLUDED.counterparty, country = EXCLUDED.country,"
+            " currency = EXCLUDED.currency, recurring_every_days = EXCLUDED.recurring_every_days,"
+            " occurrences = EXCLUDED.occurrences, late_fee_cents = EXCLUDED.late_fee_cents,"
+            " lateness_json = EXCLUDED.lateness_json, source = EXCLUDED.source",
             (user_id, event.id, event.label, event.kind.value, event.direction.value, event.amount_cents,
              event.due_day, event.counterparty, event.country, event.currency, event.recurring_every_days,
              event.occurrences, event.late_fee_cents, json.dumps(list(event.lateness_days)), source),
@@ -434,10 +573,9 @@ class Store:
 
     def ledger_for(self, user_id: str, persona_id: str, opening_balance_cents: int,
                    currency: str = "USD", country: str = "") -> Ledger:
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM cash_event WHERE user_id = ? ORDER BY due_day, id", (user_id,)
-            ).fetchall()
+        rows = self._do(lambda conn: conn.execute(
+            "SELECT * FROM cash_event WHERE user_id = %s ORDER BY due_day, id", (user_id,)
+        ).fetchall())
         events = [
             CashEvent(
                 id=row["id"],
@@ -465,37 +603,40 @@ class Store:
         )
 
     def put_event(self, user_id: str, event: CashEvent, source: str) -> None:
-        with self._lock:
-            self._insert_event(user_id, event, source)
-            self._conn.commit()
+        self._do(lambda conn: self._insert_event(conn, user_id, event, source))
 
     def delete_event(self, user_id: str, event_id: str) -> bool:
-        with self._lock:
-            cursor = self._conn.execute(
-                "DELETE FROM cash_event WHERE user_id = ? AND id = ?", (user_id, event_id)
-            )
-            self._conn.commit()
+        cursor = self._do(lambda conn: conn.execute(
+            "DELETE FROM cash_event WHERE user_id = %s AND id = %s", (user_id, event_id)
+        ))
         return cursor.rowcount > 0
 
     # -------------------------------------------------------------- calibration
 
     def save_predictions(self, user_id: str, records: list[Prediction]) -> None:
-        with self._lock:
-            for record in records:
-                self._conn.execute(
-                    "INSERT OR REPLACE INTO prediction (user_id, id, subject, statement, probability,"
-                    " made_on_day, resolves_on_day, outcome, tool, check_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (user_id, record.id, record.subject, record.statement, record.probability,
-                     record.made_on_day, record.resolves_on_day, record.outcome.value, record.tool,
-                     json.dumps(record.check)),
-                )
-            self._conn.commit()
+        def work(conn):
+            with conn.transaction():
+                for record in records:
+                    conn.execute(
+                        "INSERT INTO prediction (user_id, id, subject, statement, probability,"
+                        " made_on_day, resolves_on_day, outcome, tool, check_json)"
+                        " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+                        " ON CONFLICT (user_id, id) DO UPDATE SET"
+                        " subject = EXCLUDED.subject, statement = EXCLUDED.statement,"
+                        " probability = EXCLUDED.probability, made_on_day = EXCLUDED.made_on_day,"
+                        " resolves_on_day = EXCLUDED.resolves_on_day, outcome = EXCLUDED.outcome,"
+                        " tool = EXCLUDED.tool, check_json = EXCLUDED.check_json",
+                        (user_id, record.id, record.subject, record.statement, record.probability,
+                         record.made_on_day, record.resolves_on_day, record.outcome.value, record.tool,
+                         json.dumps(record.check)),
+                    )
+
+        self._do(work)
 
     def load_predictions(self, user_id: str) -> list[Prediction]:
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM prediction WHERE user_id = ? ORDER BY made_on_day, id", (user_id,)
-            ).fetchall()
+        rows = self._do(lambda conn: conn.execute(
+            "SELECT * FROM prediction WHERE user_id = %s ORDER BY made_on_day, id", (user_id,)
+        ).fetchall())
         return [
             Prediction(
                 id=row["id"], subject=row["subject"], statement=row["statement"],
@@ -510,18 +651,20 @@ class Store:
 
     def save_branch(self, user_id: str, key: str, label: str, cancelled: frozenset[str],
                     chase: frozenset[str], shifted: tuple[tuple[str, int], ...]) -> None:
-        with self._lock:
-            self._conn.execute(
-                "INSERT OR REPLACE INTO branch (user_id, key, label, cancelled_json, chase_json, shifted_json)"
-                " VALUES (?,?,?,?,?,?)",
-                (user_id, key, label, json.dumps(sorted(cancelled)), json.dumps(sorted(chase)),
-                 json.dumps([list(pair) for pair in shifted])),
-            )
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "INSERT INTO branch (user_id, key, label, cancelled_json, chase_json, shifted_json)"
+            " VALUES (%s,%s,%s,%s,%s,%s)"
+            " ON CONFLICT (user_id, key) DO UPDATE SET"
+            " label = EXCLUDED.label, cancelled_json = EXCLUDED.cancelled_json,"
+            " chase_json = EXCLUDED.chase_json, shifted_json = EXCLUDED.shifted_json",
+            (user_id, key, label, json.dumps(sorted(cancelled)), json.dumps(sorted(chase)),
+             json.dumps([list(pair) for pair in shifted])),
+        ))
 
     def load_branches(self, user_id: str) -> list[dict]:
-        with self._lock:
-            rows = self._conn.execute("SELECT * FROM branch WHERE user_id = ? ORDER BY key", (user_id,)).fetchall()
+        rows = self._do(lambda conn: conn.execute(
+            "SELECT * FROM branch WHERE user_id = %s ORDER BY key", (user_id,)
+        ).fetchall())
         return [
             {
                 "key": row["key"],
@@ -534,58 +677,58 @@ class Store:
         ]
 
     def delete_branch(self, user_id: str, key: str) -> None:
-        with self._lock:
-            self._conn.execute("DELETE FROM branch WHERE user_id = ? AND key = ?", (user_id, key))
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "DELETE FROM branch WHERE user_id = %s AND key = %s", (user_id, key)
+        ))
 
     # ---------------------------------------------------------------- payments
 
     def save_payment(self, user_id: str, record: PaymentRecord, *, verb: str = "pay_bill",
                      direction: str = "out", settled_day: int | None = None) -> None:
-        with self._lock:
-            self._conn.execute(
-                "INSERT OR REPLACE INTO payment (user_id, idempotency_key, action_id, verb, direction,"
-                " amount_cents, currency, rail, fee_cents, recipient, country, state, attempt, provider_ref,"
-                " verified_outcome, settled_day, history_json)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (user_id, record.idempotency_key, record.action_id, verb, direction, record.amount_cents,
-                 record.currency, record.rail, record.fee_cents, record.recipient, record.country,
-                 record.state.value, record.attempt, record.provider_ref,
-                 record.verified_outcome, settled_day, json.dumps(record.history)),
-            )
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "INSERT INTO payment (user_id, idempotency_key, action_id, verb, direction,"
+            " amount_cents, currency, rail, fee_cents, recipient, country, state, attempt, provider_ref,"
+            " verified_outcome, settled_day, history_json)"
+            " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            " ON CONFLICT (user_id, idempotency_key) DO UPDATE SET"
+            " action_id = EXCLUDED.action_id, verb = EXCLUDED.verb, direction = EXCLUDED.direction,"
+            " amount_cents = EXCLUDED.amount_cents, currency = EXCLUDED.currency,"
+            " rail = EXCLUDED.rail, fee_cents = EXCLUDED.fee_cents, recipient = EXCLUDED.recipient,"
+            " country = EXCLUDED.country, state = EXCLUDED.state, attempt = EXCLUDED.attempt,"
+            " provider_ref = EXCLUDED.provider_ref, verified_outcome = EXCLUDED.verified_outcome,"
+            " settled_day = EXCLUDED.settled_day, history_json = EXCLUDED.history_json",
+            (user_id, record.idempotency_key, record.action_id, verb, direction, record.amount_cents,
+             record.currency, record.rail, record.fee_cents, record.recipient, record.country,
+             record.state.value, record.attempt, record.provider_ref,
+             record.verified_outcome, settled_day, json.dumps(record.history)),
+        ))
 
     def load_payments(self, user_id: str) -> list[dict]:
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM payment WHERE user_id = ? ORDER BY attempt, idempotency_key", (user_id,)
-            ).fetchall()
+        rows = self._do(lambda conn: conn.execute(
+            "SELECT * FROM payment WHERE user_id = %s ORDER BY attempt, idempotency_key", (user_id,)
+        ).fetchall())
         return [dict(row) for row in rows]
 
     def payments_in_state(self, state: str) -> list[dict]:
         """One state's records across every account: the reconciler's worklist."""
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM payment WHERE state = ? ORDER BY user_id, action_id, attempt",
-                (state,),
-            ).fetchall()
+        rows = self._do(lambda conn: conn.execute(
+            "SELECT * FROM payment WHERE state = %s ORDER BY user_id, action_id, attempt", (state,)
+        ).fetchall())
         return [dict(row) for row in rows]
 
     # ------------------------------------------------------------------- audit
 
     def append_log(self, user_id: str, day: int, kind: str, payload: dict) -> None:
-        with self._lock:
-            self._conn.execute(
-                "INSERT INTO action_log (user_id, day, kind, payload_json, created_at) VALUES (?,?,?,?,?)",
-                (user_id, day, kind, json.dumps(payload, default=str), time.time()),
-            )
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "INSERT INTO action_log (user_id, day, kind, payload_json, created_at)"
+            " VALUES (%s,%s,%s,%s,%s)",
+            (user_id, day, kind, json.dumps(payload, default=str), time.time()),
+        ))
 
     def read_log(self, user_id: str, limit: int = 50) -> list[dict]:
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM action_log WHERE user_id = ? ORDER BY seq DESC LIMIT ?", (user_id, limit)
-            ).fetchall()
+        rows = self._do(lambda conn: conn.execute(
+            "SELECT * FROM action_log WHERE user_id = %s ORDER BY seq DESC LIMIT %s", (user_id, limit)
+        ).fetchall())
         return [
             {
                 "seq": row["seq"],
@@ -602,26 +745,22 @@ class Store:
     def create_connection(self, user_id: str, name: str) -> tuple[str, str]:
         connection_id = uuid.uuid4().hex[:12]
         key = uuid.uuid4().hex + uuid.uuid4().hex
-        with self._lock:
-            self._conn.execute(
-                "INSERT INTO connection (id, user_id, name, key_hash, created_at) VALUES (?,?,?,?,?)",
-                (connection_id, user_id, name.strip() or "unnamed", _secret_hash(key), time.time()),
-            )
-            self._conn.commit()
+        self._do(lambda conn: conn.execute(
+            "INSERT INTO connection (id, user_id, name, key_hash, created_at) VALUES (%s,%s,%s,%s,%s)",
+            (connection_id, user_id, name.strip() or "unnamed", _secret_hash(key), time.time()),
+        ))
         return connection_id, key
 
     def connections_for(self, user_id: str) -> list[dict]:
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT id, name, created_at FROM connection WHERE user_id = ? ORDER BY created_at", (user_id,)
-            ).fetchall()
+        rows = self._do(lambda conn: conn.execute(
+            "SELECT id, name, created_at FROM connection WHERE user_id = %s ORDER BY created_at", (user_id,)
+        ).fetchall())
         return [dict(row) for row in rows]
 
     def owner_of_connection(self, connection_id: str, key: str) -> str | None:
-        with self._lock:
-            row = self._conn.execute(
-                "SELECT user_id, key_hash FROM connection WHERE id = ?", (connection_id,)
-            ).fetchone()
+        row = self._do(lambda conn: conn.execute(
+            "SELECT user_id, key_hash FROM connection WHERE id = %s", (connection_id,)
+        ).fetchone())
         if row is None or not hmac.compare_digest(row["key_hash"], _secret_hash(key)):
             return None
         return row["user_id"]

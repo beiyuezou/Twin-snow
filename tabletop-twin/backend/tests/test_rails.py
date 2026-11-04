@@ -9,14 +9,13 @@ reason, which is worse than the provider declining the charge.
 from __future__ import annotations
 
 import json
-import shutil
-import sqlite3
-import tempfile
 import time
 from dataclasses import replace
 from pathlib import Path
 
+import psycopg
 import pytest
+from psycopg import sql
 
 from twin.payments.machine import PaymentRecord, PaymentState
 from twin.payments.paypal import ProviderResult, SandboxTransport, to_amount
@@ -24,7 +23,7 @@ from twin.payments.rails import SANDBOX_RAIL, Rail, load_catalog
 from twin.planner.rules import RulePlanner
 from twin.planner.tools import REGISTRY, handler_map
 from twin.policy.engine import Action, Policy, SpendWindow, Verdict, evaluate
-from twin.store import Store
+from twin.store import Store, db_url, drop_schema, schema_name
 from twin.world import reconcile
 from twin.world.scene import payments as scene_payments
 from twin.world.scene import scene_payload
@@ -364,7 +363,7 @@ def restored_world(store: Store, rail: str) -> Session:
 def test_a_world_cannot_come_back_claiming_a_rail_it_has_no_transport_for(monkeypatch):
     monkeypatch.delenv("PAYPAL_CLIENT_ID", raising=False)
     monkeypatch.delenv("PAYPAL_SECRET", raising=False)
-    box = Store(":memory:")
+    box = Store.temporary()
     try:
         session = restored_world(box, "paypal")
         assert session.rail == SANDBOX_RAIL
@@ -379,7 +378,7 @@ def test_credentials_bring_the_saved_rail_back_with_the_right_transport(monkeypa
     monkeypatch.setenv("PAYPAL_CLIENT_ID", "client")
     monkeypatch.setenv("PAYPAL_SECRET", "secret")
     monkeypatch.delenv("PAYPAL_ENVIRONMENT", raising=False)
-    box = Store(":memory:")
+    box = Store.temporary()
     try:
         session = restored_world(box, "paypal")
         assert session.rail == "paypal"
@@ -389,7 +388,7 @@ def test_credentials_bring_the_saved_rail_back_with_the_right_transport(monkeypa
 
 
 def test_a_rail_with_no_adapter_anywhere_still_comes_home_as_the_fake():
-    box = Store(":memory:")
+    box = Store.temporary()
     try:
         assert restored_world(box, "local_transfer").rail == SANDBOX_RAIL
     finally:
@@ -447,62 +446,75 @@ def test_a_stone_carries_the_country_its_counterparty_lives_in():
 def test_an_open_payment_reports_the_rail_and_its_fee():
     session = Session.build(use_model=False)
     session.set_rail("paypal", SandboxTransport())
-    # Over the approval floor, so the payment waits for a pinch instead of settling
-    # immediately and dropping out of the scene.
-    session.tool_propose_action("pay_bill", event_id="sub-scan", amount_cents=6_000)
+    # The bill's own amount, which is over the approval floor, so the payment waits for
+    # a pinch instead of settling immediately and dropping out of the scene.
+    amount = session.ledger.by_id("sub-scan").amount_cents
+    assert amount >= session.policy.approval_floor_cents
+    session.tool_propose_action("pay_bill", event_id="sub-scan")
     row = next(p for p in scene_payments(session) if p["recipient"] == "Highres Club")
     assert row["rail"] == "paypal" and row["currency"] == "USD"
     assert row["country"] == "DE"
     assert row["state"] == PaymentState.PROPOSED.value
-    expected = PAYPAL.fee_cents(6_000, sender_country="US", recipient_country="DE")
+    expected = PAYPAL.fee_cents(amount, sender_country="US", recipient_country="DE")
     assert row["fee_dollars"] == round(expected / 100, 2)
 
 
 # -------------------------------------------------------------- migration
 
 
-OLD_SCHEMA = """
-CREATE TABLE world (
-  user_id TEXT PRIMARY KEY, persona_id TEXT NOT NULL, day INTEGER NOT NULL DEFAULT 0,
-  horizon_days INTEGER NOT NULL, runs INTEGER NOT NULL, opening_balance_cents INTEGER NOT NULL,
-  policy_json TEXT NOT NULL, focus TEXT NOT NULL DEFAULT '', last_speech TEXT NOT NULL DEFAULT '',
-  tested_on_day INTEGER NOT NULL DEFAULT -1, updated_at REAL NOT NULL);
-CREATE TABLE cash_event (
-  user_id TEXT NOT NULL, id TEXT NOT NULL, label TEXT NOT NULL, kind TEXT NOT NULL,
-  direction TEXT NOT NULL, amount_cents INTEGER NOT NULL, due_day INTEGER NOT NULL,
-  counterparty TEXT NOT NULL DEFAULT '', recurring_every_days INTEGER, occurrences INTEGER NOT NULL DEFAULT 1,
-  late_fee_cents INTEGER NOT NULL DEFAULT 0, lateness_json TEXT NOT NULL DEFAULT '[]',
-  source TEXT NOT NULL DEFAULT 'seed', PRIMARY KEY (user_id, id));
-CREATE TABLE payment (
-  user_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, action_id TEXT NOT NULL,
-  verb TEXT NOT NULL DEFAULT 'pay_bill', direction TEXT NOT NULL DEFAULT 'out',
-  amount_cents INTEGER NOT NULL, recipient TEXT NOT NULL DEFAULT '', state TEXT NOT NULL,
-  attempt INTEGER NOT NULL DEFAULT 0, provider_ref TEXT, verified_outcome TEXT, settled_day INTEGER,
-  history_json TEXT NOT NULL DEFAULT '[]', PRIMARY KEY (user_id, idempotency_key));
-"""
+OLD_TABLES = (
+    """
+    CREATE TABLE world (
+      user_id TEXT PRIMARY KEY, persona_id TEXT NOT NULL, day INTEGER NOT NULL DEFAULT 0,
+      horizon_days INTEGER NOT NULL, runs INTEGER NOT NULL, opening_balance_cents BIGINT NOT NULL,
+      policy_json TEXT NOT NULL, focus TEXT NOT NULL DEFAULT '', last_speech TEXT NOT NULL DEFAULT '',
+      tested_on_day INTEGER NOT NULL DEFAULT -1, updated_at DOUBLE PRECISION NOT NULL)
+    """,
+    """
+    CREATE TABLE cash_event (
+      user_id TEXT NOT NULL, id TEXT NOT NULL, label TEXT NOT NULL, kind TEXT NOT NULL,
+      direction TEXT NOT NULL, amount_cents BIGINT NOT NULL, due_day INTEGER NOT NULL,
+      counterparty TEXT NOT NULL DEFAULT '', recurring_every_days INTEGER,
+      occurrences INTEGER NOT NULL DEFAULT 1, late_fee_cents BIGINT NOT NULL DEFAULT 0,
+      lateness_json TEXT NOT NULL DEFAULT '[]', source TEXT NOT NULL DEFAULT 'seed',
+      PRIMARY KEY (user_id, id))
+    """,
+    """
+    CREATE TABLE payment (
+      user_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, action_id TEXT NOT NULL,
+      verb TEXT NOT NULL DEFAULT 'pay_bill', direction TEXT NOT NULL DEFAULT 'out',
+      amount_cents BIGINT NOT NULL, recipient TEXT NOT NULL DEFAULT '', state TEXT NOT NULL,
+      attempt INTEGER NOT NULL DEFAULT 0, provider_ref TEXT, verified_outcome TEXT, settled_day INTEGER,
+      history_json TEXT NOT NULL DEFAULT '[]', PRIMARY KEY (user_id, idempotency_key))
+    """,
+)
 
 
-def write_an_old_database(path: Path) -> None:
-    conn = sqlite3.connect(path)
-    conn.executescript(OLD_SCHEMA)
-    conn.execute(
-        "INSERT INTO world (user_id, persona_id, horizon_days, runs, opening_balance_cents, policy_json,"
-        " updated_at) VALUES ('old', 'juno-reyes', 90, 2000, 120000, '{}', 1.0)"
-    )
-    conn.execute(
-        "INSERT INTO payment (user_id, idempotency_key, action_id, amount_cents, recipient, state)"
-        " VALUES ('old', 'tt-old', 'act-old', 2400, 'Highres Club', 'unknown')"
-    )
-    conn.commit()
-    conn.close()
+def write_an_old_database(name: str) -> None:
+    """A database from before those columns existed, standing in a schema of its own."""
+    conn = psycopg.connect(db_url(), autocommit=True)
+    try:
+        conn.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(name)))
+        conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(name)))
+        for statement in OLD_TABLES:
+            conn.execute(statement)
+        conn.execute(
+            "INSERT INTO world (user_id, persona_id, horizon_days, runs, opening_balance_cents, policy_json,"
+            " updated_at) VALUES ('old', 'juno-reyes', 90, 2000, 120000, '{}', 1.0)"
+        )
+        conn.execute(
+            "INSERT INTO payment (user_id, idempotency_key, action_id, amount_cents, recipient, state)"
+            " VALUES ('old', 'tt-old', 'act-old', 2400, 'Highres Club', 'unknown')"
+        )
+    finally:
+        conn.close()
 
 
 def test_an_older_database_is_given_the_columns_it_lacks():
-    box = Path(tempfile.mkdtemp(prefix="twin-migrate-"))
-    path = box / "twin.db"
+    name = schema_name()
     try:
-        write_an_old_database(path)
-        store = Store(str(path))
+        write_an_old_database(name)
+        store = Store(schema=name)
         try:
             row = store.world_row("old")
             assert row["currency"] == "USD" and row["rail"] == "sandbox"
@@ -514,21 +526,20 @@ def test_an_older_database_is_given_the_columns_it_lacks():
         finally:
             store.close()
     finally:
-        shutil.rmtree(box, ignore_errors=True)
+        drop_schema(name)
 
 
 def test_a_second_open_of_a_migrated_database_changes_nothing():
-    box = Path(tempfile.mkdtemp(prefix="twin-migrate-"))
-    path = box / "twin.db"
+    name = schema_name()
     try:
-        write_an_old_database(path)
-        first = Store(str(path))
+        write_an_old_database(name)
+        first = Store(schema=name)
         first.close()
-        second = Store(str(path))
+        second = Store(schema=name)
         assert second.payments_in_state("unknown")[0]["rail"] == "sandbox"
         second.close()
     finally:
-        shutil.rmtree(box, ignore_errors=True)
+        drop_schema(name)
 
 
 # ------------------------------------------------------------- reconciler
@@ -560,7 +571,7 @@ def unknown_record(action_id: str = "act-1", **field) -> PaymentRecord:
 
 @pytest.fixture()
 def store():
-    box = Store(":memory:")
+    box = Store.temporary()
     try:
         yield box
     finally:

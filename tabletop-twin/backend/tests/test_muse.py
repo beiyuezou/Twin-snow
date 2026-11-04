@@ -11,9 +11,6 @@ sentences are each checked before any of them is shown.
 from __future__ import annotations
 
 import json
-import shutil
-import tempfile
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,6 +31,7 @@ from twin.planner.model import (
     safe_release,
 )
 from twin.planner.tools import REGISTRY
+from twin.store import drop_schema, schema_name
 from twin.world.session import Session
 
 CONTEXT = {"horizon_days": 90, "events": [], "chasable": [], "cancellable": []}
@@ -423,8 +421,8 @@ def test_a_stream_frozen_mid_sentence_leaves_the_world_a_verified_line(muse):
 @pytest.fixture()
 def table(muse, monkeypatch):
     """The same gateway with an HTTP edge in front of it, and an account to speak for."""
-    box = Path(tempfile.mkdtemp(prefix="twin-muse-"))
-    monkeypatch.setenv("TWIN_DB_PATH", str(box / "twin.db"))
+    name = schema_name()
+    monkeypatch.setenv("TWIN_DB_SCHEMA", name)
     main.reset_state()
     client = TestClient(main.app)
     made = client.post("/v1/signup", json={"email": "ada@acme.io", "name": "Ada",
@@ -433,7 +431,7 @@ def table(muse, monkeypatch):
         yield client, {"Authorization": f"Bearer {made.json()['token']}"}
     finally:
         main.reset_state()
-        shutil.rmtree(box, ignore_errors=True)
+        drop_schema(name)
 
 
 def streamed(client, bearer: dict, intent: str) -> list[tuple[str, dict]]:

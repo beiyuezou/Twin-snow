@@ -7,17 +7,15 @@ these fixtures arrive at a table two ways: by token and by the key a browser kee
 from __future__ import annotations
 
 import json
-import shutil
-import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from fake_muse import read_sse
 from twin.api import main
+from twin.store import drop_schema, schema_name
 from twin.world.session import Session
 
 PASSWORD = "tabletop-2026"
@@ -40,14 +38,14 @@ class StubRequest:
 
 @pytest.fixture()
 def client(monkeypatch):
-    box = Path(tempfile.mkdtemp(prefix="twin-test-"))
-    monkeypatch.setenv("TWIN_DB_PATH", str(box / "twin.db"))
+    name = schema_name()
+    monkeypatch.setenv("TWIN_DB_SCHEMA", name)
     main.reset_state()
     try:
         yield TestClient(main.app)
     finally:
         main.reset_state()
-        shutil.rmtree(box, ignore_errors=True)
+        drop_schema(name)
 
 
 def sign_up(client, email: str, name: str) -> dict:

@@ -47,14 +47,14 @@ def store() -> Store:
     """The one connection every request writes through, opened by whoever asks first.
 
     A browser boots two systems at once, so two first requests can arrive before
-    either has finished opening the file. The second waits rather than standing up a
-    second connection to a database that is mid-write.
+    either has finished opening the connection. The second waits rather than standing
+    up a second connection to a server that is mid-transaction.
     """
     global _store
     if _store is None:
         with _store_opening:
             if _store is None:
-                _store = Store(os.environ.get("TWIN_DB_PATH", "twin.db"))
+                _store = Store()
     return _store
 
 
