@@ -29,6 +29,23 @@ The river itself is deliberately not grabbable, and the wheel is only ever writt
 by the client when no hand is holding it, so a gesture and the drawing system never
 fight over the same transform.
 
+## Where the table is
+
+The surface this twin stands on is looked for rather than assumed. In an AR session the
+first steady, upward-facing hit that sits at table height and within arm's reach becomes
+the table, and the miniature turns to face whoever found it. A wall, the floor, a shelf
+and anything across the room are all rejected, and a placement is taken once per session
+and never revised, because a table that slides across the room when the estimate
+improves is worse than one that stays where the app put it. With no session, no granted
+hit-test, or nothing that qualifies, the authored pose stands — which is what a browser
+without a headset sees, and what the orb's pointing is computed in, so a rotated table
+still points at the right bill.
+
+The panel band sits above and behind the table rather than across it. The three cards are
+at chest height, clear of the channel, and the wheel's own readout hovers beside the
+wheel instead of over it; every tilt is worked out from the standing head position, so a
+card faces the person rather than the room.
+
 ## Accessibility
 
 Speech is mirrored as captions on a panel, so the app is complete with sound off.
@@ -73,9 +90,21 @@ mid-flight. The same run tried to settle a payment with a click instead of a hol
 the machine refused it, so the exception described under Accessibility is measured, not
 intended. Nothing reached the console and no request failed.
 
-What a browser cannot reach is the hand. The token is picked up by a near grab, and
-holding the pointer where the coin sits produced no request at all, so the one-second
-pinch, the panel state that only appears while a hold is settling, and everything about
-how this table reads from inside a headset remain unproven on this machine: the managed
-editor never became command-ready here. Nothing in this file should be read as "tested
-on a headset" until someone runs it.
+What a browser cannot reach is the hand, and what this machine cannot reach is a
+session. The token is picked up by a near grab, and holding the pointer where the coin
+sits produced no request at all, so the one-second pinch and the panel state that only
+appears while a hold is settling remain unproven.
+
+The managed editor did become command-ready for this pass, and the composition was
+checked with it rather than argued about: three renders of the authored hero view, the
+first of which showed the panel band sitting so low and so wide that its bottom edges
+covered the river, which is what moved the cards up and back and lifted the hero frame's
+aim to the content centre. The scene document reports valid with no warnings on every
+one of those renders, and the running app boots in a real browser with the placement
+system registered — canvas present, WebXR available, nothing in the console beyond the
+GPU driver's own readback warnings.
+
+None of that is AR evidence. The XR app target never attached on this machine, so the
+placement code has never seen a real surface, has never had a hit-test source granted,
+and has never turned a miniature to face a person. Nothing in this file should be read
+as "tested on a headset" until someone runs it.

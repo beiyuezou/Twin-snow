@@ -36,6 +36,15 @@ Four weeks of history are seeded so the table is alive in the first minute, with
 setup. A daily wind-down, a published accuracy score, and a garden that only the
 passage of time can grow are the return hooks.
 
+Where the table physically is gets settled at runtime rather than assumed. In an AR
+session the first steady surface at table height and within arm's reach becomes it, and
+the miniature turns to face whoever found it; a wall, the floor and anything across the
+room are refused, and a placement is taken once and never revised, because a table that
+slides when the estimate improves is worse than one that stays put. A browser, an
+ungranted hit-test, and a room with nothing that qualifies all keep the authored pose.
+The panel band sits above and behind the channel, each card tilted to the standing head
+rather than to the room, so the shapes stay the subject and the words stay captions.
+
 ## Division of labour
 
 Code computes every number. The forecast, the forks, the probabilities, the
@@ -297,7 +306,22 @@ everything about how this table reads from inside a headset remain unproven on t
 machine. The state machine those gestures drive is tested in the service; the gesture
 itself is not.
 
-Live immersive evidence was **not** captured on this machine: the managed XR browser
-would not start alongside the browser already running here, so no claim about headset
-poses, hand tracking, controller rays or framing should be read as tested. Run
-`npm run dev` on a clean machine to get that evidence.
+Live immersive evidence was still not captured, but the composition no longer rests on
+argument: the managed editor became command-ready for this pass and the table was measured
+through it. Three renders of the authored hero view, the first of which showed the panel
+band sitting low enough and wide enough that its bottom edges covered the river — the
+metaphor was behind the captions. That is what lifted the three cards above and behind the
+channel, put the wheel's readout beside the wheel instead of across it, tilted every panel
+to the standing head rather than to the room, and moved the hero frame's aim onto the
+content centre. The scene document reported valid with no warnings on all three renders,
+and the running app boots in a real browser with the surface-placement system registered,
+canvas up, WebXR available and nothing in the console but the GPU driver's own readback
+warnings. The shadow flags on the placed props are the one change these renders cannot
+show: the editor draws on black, so a caught shadow has nothing to land on, and that work
+only tells in AR, where the plate is the difference between a miniature resting on a table
+and one floating above it.
+
+What never attached here is an XR session. The placement code has not seen a real surface,
+no hit-test source has been granted on this machine, and no claim about headset poses, hand
+tracking, controller rays or where this miniature actually lands should be read as tested.
+Run `npm run dev` with a headset attached to get that evidence.

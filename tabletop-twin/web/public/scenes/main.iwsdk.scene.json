@@ -6,7 +6,7 @@
       "sky": [0.96, 0.94, 0.9, 1],
       "equator": [0.72, 0.7, 0.66, 1],
       "ground": [0.42, 0.38, 0.34, 1],
-      "intensity": 0.22
+      "intensity": 0.45
     }
   },
   "environment": {
@@ -68,7 +68,7 @@
           "id": "river",
           "name": "River",
           "framingRole": "content",
-          "content": { "type": "asset", "asset": "twin-river" },
+          "content": { "type": "asset", "asset": "twin-river", "receiveShadow": true },
           "transform": { "position": [0, 0, 0], "scale": [0.9, 1, 1] },
           "components": {
             "RiverFlow": { "dryAt": -1, "flow": 1 }
@@ -78,14 +78,14 @@
           "id": "lake",
           "name": "Savings Lake",
           "framingRole": "support",
-          "content": { "type": "asset", "asset": "twin-lake" },
+          "content": { "type": "asset", "asset": "twin-lake", "castShadow": true, "receiveShadow": true },
           "transform": { "position": [0.4, 0, -0.16] }
         },
         {
           "id": "fork-ribbon",
           "name": "Fork Ribbon",
           "framingRole": "content",
-          "content": { "type": "asset", "asset": "twin-ribbon" },
+          "content": { "type": "asset", "asset": "twin-ribbon", "castShadow": true, "receiveShadow": true },
           "transform": { "position": [0, 0.016, 0.005] },
           "components": {
             "ForkRibbon": { "branchId": "", "pull": 0 },
@@ -103,7 +103,7 @@
           "id": "time-wheel",
           "name": "Time Wheel",
           "framingRole": "content",
-          "content": { "type": "asset", "asset": "twin-wheel" },
+          "content": { "type": "asset", "asset": "twin-wheel", "castShadow": true, "receiveShadow": true },
           "transform": { "position": [-0.42, 0.01, 0.21], "scale": 0.82 },
           "components": {
             "TimeWheel": { "day": 0, "turnDeg": 0 },
@@ -120,7 +120,7 @@
           "id": "approval-token",
           "name": "Approval Token",
           "framingRole": "content",
-          "content": { "type": "asset", "asset": "twin-token" },
+          "content": { "type": "asset", "asset": "twin-token", "castShadow": true, "receiveShadow": true },
           "transform": { "position": [0.16, 0.008, 0.24] },
           "components": {
             "ApprovalPrompt": { "hold": 0, "armed": false },
@@ -131,7 +131,7 @@
           "id": "orb",
           "name": "Twin Orb",
           "framingRole": "content",
-          "content": { "type": "asset", "asset": "twin-orb" },
+          "content": { "type": "asset", "asset": "twin-orb", "receiveShadow": true },
           "transform": { "position": [0.34, 0.16, 0.24] },
           "components": {
             "TwinOrb": { "mood": "idle", "accuracyPct": 0 }
@@ -142,7 +142,7 @@
           "name": "Captions",
           "framingRole": "content",
           "content": { "type": "asset", "asset": "twin-captions" },
-          "transform": { "position": [-0.02, 0.36, -0.24], "rotationDeg": [-8, 0, 0] },
+          "transform": { "position": [-0.02, 0.52, -0.42], "rotationDeg": [-10, 1, 0] },
           "components": {
             "RayInteractable": {}
           }
@@ -152,7 +152,7 @@
           "name": "Approve Panel",
           "framingRole": "support",
           "content": { "type": "asset", "asset": "twin-approve" },
-          "transform": { "position": [0.7, 0.34, -0.04], "rotationDeg": [-6, -21, 0] },
+          "transform": { "position": [0.8, 0.5, -0.1], "rotationDeg": [-11, -25, 0] },
           "components": {
             "RayInteractable": {}
           }
@@ -162,7 +162,7 @@
           "name": "Rails Panel",
           "framingRole": "support",
           "content": { "type": "asset", "asset": "twin-rails" },
-          "transform": { "position": [-0.78, 0.22, -0.22], "rotationDeg": [-10, 26, 0] },
+          "transform": { "position": [-0.86, 0.48, -0.34], "rotationDeg": [-11, 24, 0] },
           "components": {
             "RayInteractable": {}
           }
@@ -172,7 +172,7 @@
           "name": "Time Wheel Plate",
           "framingRole": "support",
           "content": { "type": "asset", "asset": "twin-wheel-plate" },
-          "transform": { "position": [-0.34, 0.15, 0.32], "rotationDeg": [-14, 16, 0] }
+          "transform": { "position": [-0.36, 0.22, 0.3], "rotationDeg": [-26, 16, 0] }
         }
       ]
     },
@@ -216,9 +216,9 @@
         "id": "hero",
         "role": "hero",
         "projection": "perspective",
-        "position": [0, 1.32, 0.86],
-        "target": [0, 0.74, -0.6],
-        "fov": 46
+        "position": [0, 1.55, 1.62],
+        "target": [0, 1.05, -0.62],
+        "fov": 55
       },
       {
         "id": "spawn",

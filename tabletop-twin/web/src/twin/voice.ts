@@ -274,6 +274,11 @@ export class TwinVoiceSystem extends createSystem({
     if (!body) return;
     object.getWorldPosition(this.target);
     this.orb.getWorldPosition(this.origin);
+    // Both points are read in the frame the body actually turns in, so a table that
+    // was placed by AR and rotated to face the person still points at the right bill.
+    const frame = body.parent ?? body;
+    frame.worldToLocal(this.target);
+    frame.worldToLocal(this.origin);
     body.rotation.y = Math.atan2(-(this.target.z - this.origin.z), this.target.x - this.origin.x);
   }
 
