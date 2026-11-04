@@ -74,6 +74,17 @@ arrived. In `unknown` the twin is not permitted to retry blindly; it reconciles
 first. Anything above the limits, or outside the allow-listed verbs, requires a
 hold-pinch from the human. Denials are silent about money: no state changes.
 
+In front of those budget rules is a shorter layer that is not about the budget at all.
+It asks whether a proposal is a thing this service can read: the bill it names has to be
+in the ledger, its amount has to be a number of cents, a charge has to move something, and
+the amount and the payee have to agree with the entry they cite. The difference matters
+because the two layers can be changed by different people. A person can raise their own
+approval floor as far as they like; nothing a model says can make a two-hundred-and-forty
+dollar subscription cost sixty. Refusals from either layer carry the name of the rule that
+stopped them, and a proposal stopped here never becomes a payment record at all — there is
+nothing to cancel and no gesture that could revive it. [GUARDRAILS.md](GUARDRAILS.md)
+writes out all six, and what each one is for.
+
 A separate reliability check treats a settled payment as unfinished until its
 business effect is seen. Until then the twin says so in the daily heartbeat — money
 taken, outcome not observed — rather than marking the job done. The garden stays a
@@ -115,8 +126,9 @@ claimed or anonymous — owns its own ledger, payments, branches and history. Wh
 refused is a request that names nobody: with neither a bearer token nor a device key the
 service answers 401 rather than guessing whose cash flow to draw. A device key is a
 credential and is treated as one: it is stored only as a hash, and an id short enough to
-guess is refused instead of trusted. A world is written down after every change, so the
-same table, the same history and the same ceilings are there after a restart.
+guess is refused instead of trusted. A world is written to PostgreSQL after every change,
+so the same table, the same history and the same ceilings are there after a restart — and
+after a restart onto a different machine.
 
 Nothing the twin did is thrown away. Each ask, verdict, rule, gesture and
 reconciliation is kept as an append-only log and can be read back as entries or as a
@@ -169,11 +181,20 @@ OpenAI-compatible server has no published address, so it needs all three of its 
 thing that is never assumed: with no model key the service still answers, from the
 rule planner, and says which route it took. With no PayPal credentials it settles
 against a deterministic sandbox transport; the real transport has to be asked for
-explicitly and refuses to start without its credentials. `TWIN_DB_PATH` moves the
-store, `TWIN_ALLOW_ORIGINS` says which client origins may call it (its default is the
+explicitly and refuses to start without its credentials. `TWIN_DB_URL` names the
+PostgreSQL server the worlds live on — and it is the one setting with no default, because
+a table that only exists on the machine that served it is not somebody's world, it is a
+cache. `TWIN_ALLOW_ORIGINS` says which client origins may call it (its default is the
 origin the immersive client's own dev server uses, because a table that cannot reach
 the service draws nothing), and `TWIN_RECONCILE_SEC` — off by default — turns on the
 background sweep of payments that are still waiting for an answer.
+
+The test suite needs a server for the same reason the service does. Point
+`TWIN_DB_URL` at one you already run and every test gets a schema of its own on it, so
+nothing is read from a previous run and nothing is written to `public`. Leave it unset and
+the suite starts a throwaway instance on localhost from the packaged binaries, in the temp
+directory, with trust authentication — a fixture, not something to put real worlds on —
+and stops it on the way out.
 
 A headset has no keyboard, so the client never asks for one. The first visit generates
 a device key — 32 random bytes it keeps — and carries it on every request; the service
@@ -185,9 +206,10 @@ from then on.
 
 ## Verification status
 
-The service is covered by 287 tests that run the forecast, the forks, the policy
-engine, the payment state machine, the settlement catalog, the accounts, the world a
-device opens for itself, the audit trail, the real PayPal transport and the Muse route —
+The service is covered by 309 tests that run the forecast, the forks, the policy
+engine, the guardrails in front of it, the payment state machine, the settlement catalog,
+the accounts, the world a device opens for itself, the audit trail, the real PayPal
+transport and the Muse route —
 each of the last two against a gateway that answers on a socket, so a refused credential,
 a rate limit, a reply that never arrives, a stream that invents a figure mid-sentence and
 a gateway that refuses one request shape are all exercised here rather than discovered in
@@ -195,15 +217,24 @@ production. Opening a world is two writes, so two first visits from one device a
 against each other on purpose — and the race was run with the guard switched off first,
 to check that there is something to guard. No test ever holds a real credential: the
 environment is emptied around every one of them, and a test that wants an endpoint stands
-it up itself.
+it up itself. The whole suite runs against a real PostgreSQL server, one schema per test,
+and the run above was measured against a server started from the packaged binaries on this
+machine: 309 passed in 84.23 seconds. The same suite ran in 41 seconds when it was 287
+tests against the file it replaced, so part of that difference is twenty-two more tests and
+part of it is a socket instead of a memory-mapped file. It is bought back the first time a
+world has to survive onto a different host.
 
-That last habit is now a file of its own. Five failures with known answers — a payment
+That last habit is now a file of its own. Six failures with known answers — a payment
 left in a state nobody owns, a rail the catalog says cannot reach a country, a narration
 quoting a figure it was never given, a click offered in place of a hold, a ledger write
-that never lands — each runs twice: once expecting the bad outcome with the guard
-switched off, once expecting the machine to stop it. A test that only asks whether the
-fix is present can pass against a fix that does nothing; one that has to produce the
-failure first cannot.
+that never lands, a database connection the server closed mid-session — each runs twice:
+once expecting the bad outcome with the guard switched off, once expecting the machine to
+stop it. A test that only asks whether the fix is present can pass against a fix that does
+nothing; one that has to produce the failure first cannot. The six guardrails are held to
+the same pair, each with only its own rule removed: without `event_is_real` a charge for a
+bill nobody owns settles with no hand on it, without `payee_matches_event` the card asks
+for a hold on the wrong company, without `charge_is_positive` a payment of zero dollars is
+written into the ledger as though money moved.
 
 The client typechecks and builds, and its scene document validates against the SDK's
 own schema and component catalog, so every asset id, component and field the code names

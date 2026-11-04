@@ -1,0 +1,119 @@
+# Guardrails
+
+What a proposal has to be before anyone is allowed to decide whether it is permitted.
+
+This service already has a policy engine: single-payment caps, rolling daily and
+monthly ceilings, per-recipient ceilings, a recipient allowlist, a weekly
+new-subscription allowance, an approval floor, and a rail-coverage map that refuses a
+payment to a country the chosen route cannot reach. Every one of those is a decision
+about **this person's budget**, and this person can change any of them tomorrow.
+
+Guardrails are the layer in front of it, and they are not about the budget at all. They
+are about whether the thing being asked is a thing this service can read. A person who
+raises their approval floor to a thousand dollars has made a choice. A proposal that
+names a bill that is not in their ledger, or that calls a two-hundred-and-forty-dollar
+subscription a sixty-dollar one, has not made a choice — it has contradicted a fact, and
+the only question is whether the machine notices.
+
+The one sentence all six rules say: **the model may ask, but it may not tell the ledger
+what the ledger says.**
+
+## What is not a guardrail
+
+Three things people usually mean by "AI safety" are deliberately absent here, and the
+absence is a decision, not an oversight.
+
+There is no classifier over the prompt. Nothing reads the words for intent, tone or
+harmfulness, and nothing refuses because a request seemed manipulative. A refusal here is
+always a fact about the ledger, the arithmetic or the shape of a number, which means it
+can be shown to a person, argued with, and — where the person is allowed to change it —
+changed. A verdict that came from a model's opinion about another model's phrasing could
+not be audited by anybody.
+
+There is no content moderation. The twin's own voice is governed by its persona
+document, not by this layer.
+
+And there is no widening. A guardrail can only stop a proposal or pass it; none of them
+can authorise a payment, raise a limit, or supply an amount that the ledger does not
+contain. Where a guardrail mentions a number it is quoting something already computed.
+
+## The six
+
+They run in a fixed order, cheapest first, and the first one is load-bearing in a way
+that is easy to miss: a proposal that names no real event has no ledger fact to
+contradict, so the two middle rules can never fire for it. That is why an invented event
+id is refused before anything is said about its amount.
+
+**`event_is_real`** — a named ledger event has to exist. Without this rule, a charge
+against a bill nobody owns still passes the budget: it has an allow-listed payee, it is
+under the approval floor, and so the policy engine approves it and it settles with no
+hand on it at all. Naming a real event is what makes everything else checkable.
+
+**`amount_is_a_number`** — an amount that cannot be read as whole cents is refused by
+name. What arrives otherwise is a string like "twelve dollars" into a field the ledger
+keeps in cents. The tempting fallback is to use the bill's own amount, which is exactly
+the danger: a human is then asked to hold a payment for a figure the model never named,
+and the audit trail says nothing about the number that was actually asked for.
+
+**`charge_is_positive`** — a charge that moves nothing is not a charge. Zero is under
+every cap, so the policy engine waves it through and it settles; a payment of zero
+dollars in the ledger is not a harmless artefact, it is a record that says this service
+moved money and did not.
+
+**`amount_matches_event`** — when the proposal names a bill and states an amount, the
+two have to agree. The bill does not get to be re-priced by whoever mentioned it. The
+number that moves is read out of the person's own events, not out of the request.
+
+**`payee_matches_event`** — the same for the counterparty. Both names in the worked case
+are on the allowlist, so nothing about the budget complains; only the ledger knows that
+this invoice is owed to Suite Works and not to Guild Mutual. Left alone, a person is
+handed a card asking them to hold a payment for the wrong company, and their approval is
+the thing that makes it look legitimate.
+
+**`figures_are_given`** — the reason attached to a payment may only quote figures this
+code already computed: the amount in cents and in currency units, the named event's own
+numbers, the day, the fee, and the person's own limits. A justification that says "the
+club usually bills 4,200 for this" when nothing in the world contains 4,200 is a
+fabricated reason sitting next to real money. This is the same discipline the narration
+is held to — a streamed sentence is not shown until the figure inside it has been checked
+against the forecast — applied to the prose that accompanies a charge.
+
+## What a stopped proposal looks like
+
+A refusal from this layer is not a cancelled payment, because it was never a payment. No
+record enters the state machine, no idempotency key exists, nothing is left pending for a
+gesture that could revive it, and no transport is contacted. The verdict is `deny`, the
+`rule` field names which of the six stopped it, and the reason says what the ledger
+actually says. One audit entry of kind `guardrail` is written, carrying the proposal as
+it arrived — the stated amount, the stated payee, the justification verbatim — so a
+person reading the trail later can see the exact thing that was refused rather than a
+sanitised summary of it.
+
+A policy denial, by contrast, does create a record and cancel it, because the payment was
+real and this person's rules said no. The two kinds of refusal are kept apart in the log
+for that reason: one is "this was never a possible payment", the other is "this was a
+possible payment and you did not allow it".
+
+Below the layer, the tool surface is still a plain validator: it checks that a call names
+one of five known tools and passes only recognised arguments. It does not evaluate JSON
+Schema bounds like a declared minimum, and this layer does not depend on it. A malformed
+argument that gets past the validator is met by `amount_is_a_number`; a validly-shaped
+lie about a real bill is met by `amount_matches_event`. Neither layer trusts the other,
+and neither can spend anything.
+
+## Proving it
+
+Each rule carries two tests, and the pair is the point. One shows the rule firing. The
+other re-runs the *same* proposal with only that one rule taken out and requires the bad
+outcome to actually happen: the invented bill really does settle, the zero really does
+land in the ledger, the hold card really does ask for the wrong company. A control that
+switches off the whole guard proves only that the guard does something; a control that
+removes one rule proves which rule was doing it. The last test in that file notices if
+any rule has lost either half and refuses to let the suite go green on a rule nobody can
+demonstrate.
+
+This is the same discipline the seeded-failure corpus uses for the older hazards — a
+payment stuck in unknown, an unreachable rail, an invented figure mid-stream, a click
+offered in place of a hold, a ledger that has not landed, a database socket that the
+server closed. A test written by whatever fixed the bug tends to ask a soft question, so
+every one of these has to be able to produce the failure first.

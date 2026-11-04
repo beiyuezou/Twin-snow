@@ -8,8 +8,10 @@ dist/
 .env.*
 .iwsdk/
 
-# A live table is accounts, tokens, decisions and payment records
-twin.db
+# A live table is accounts, tokens, decisions and payment records. The worlds are in
+# PostgreSQL now, so a database file in this directory is an accident — from the version
+# that kept them in one, or from somebody's experiment — and it stays out of the repo.
+*.db
 *.db-wal
 *.db-shm
 

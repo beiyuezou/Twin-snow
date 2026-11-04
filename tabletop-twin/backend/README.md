@@ -74,6 +74,15 @@ A model response cannot widen any of them, and asking to is itself a blocked act
 Three verdicts come out of the policy engine: allow, require a hold-pinch from the
 human, or deny.
 
+In front of the policy engine sits a shorter layer, and it is not about the budget. A
+proposal has to be a thing this service can read before anyone is asked whether it is
+allowed: the bill it names has to exist, its amount has to be a number of cents, a charge
+has to move something, the amount and the payee have to agree with the ledger entry they
+cite, and the reason attached to it may only quote figures that were computed. A person
+can raise their approval floor; nobody gets to re-price their own invoices by mentioning
+them. Six rules, each with its name in the audit trail, are written up in
+[../GUARDRAILS.md](../GUARDRAILS.md).
+
 Payments move through a strict state machine keyed by an idempotency key, and one
 state is **unknown**: the request left, the answer never came. From there a blind
 retry is refused, because a second charge could duplicate the first; the machine
@@ -136,7 +145,7 @@ A token outranks a device key, and signing up afterwards puts an email and a pas
 the world the device already had instead of opening a second one beside it — once. After
 that the credentials belong to the account, and a second signup is refused. Each account
 owns its own ledger, branches, payments, ceilings and history, and a world survives a
-restart because it is written to SQLite after every call that changes it.
+restart because it is written to PostgreSQL after every call that changes it.
 
 A device key is a credential and is treated like one: 32 random bytes made in the
 browser, stored only as a hash, and read as absent when it is short enough to guess.
@@ -172,12 +181,18 @@ python -m uvicorn twin.api.main:app --reload
 python -m pytest
 ```
 
+The worlds live in PostgreSQL, and `TWIN_DB_URL` says which server: a libpq-style URL
+such as `postgresql://twin@127.0.0.1:5432/twin`. There is no file fallback and no
+default database — a service started without that variable refuses to serve worlds rather
+than opening a local file nobody asked for, because a world that only exists on one
+machine cannot be the same table on the next. A URL that points at a `.db` file is
+refused by name for the same reason. `TWIN_ALLOW_ORIGINS` lists the client origins allowed
+to call it.
+
 Model and settlement credentials are read from the environment by name, and no value
 is kept in this repository. Muse needs only a key, since its address and default model
 are Meta's published values; a generic endpoint has no published address and so must
-name all three itself. `TWIN_DB_PATH` says where the worlds live (`twin.db` in the working directory by
-default, which is why it is git-ignored), and `TWIN_ALLOW_ORIGINS` lists the client
-origins allowed to call it.
+name all three itself.
 
 `python -m pytest` spends nothing and reveals nothing. The credential variables are
 emptied around every test, so a suite run on a machine that happens to hold a real key
@@ -186,6 +201,15 @@ are gateways the tests stand up on localhost, and they answer on a socket rather
 as stubs precisely so the awkward failures can be provoked here instead of discovered
 in production: a refused credential that must not be asked twice, a rate limit that
 names a wait, and a reply that never arrives after the work was done.
+
+The database is treated the same way. If `TWIN_DB_URL` is already set, the suite tests
+against that server and touches nothing on it but the schemas it creates and drops; each
+test gets a schema of its own, so no run reads what a previous one left behind and
+nothing is ever written to `public`. If it is not set, the suite starts a throwaway
+server on port 55432 from the packaged binaries installed with `.[dev]`, puts its files in
+the system temp directory, and stops it on the way out. That server is a test fixture, not
+a deployment: it is initialised with trust authentication on localhost, which is exactly
+what you must not point a real world at.
 
 One file is held to a different standard, because a test written by whatever fixed the
 bug tends to ask a soft question. `tests/test_regressions.py` seeds a failure with a
@@ -197,5 +221,12 @@ nothing and the denial disappears. Release every sentence unchecked and the inve
 figure reaches the panel. Put the floor above the amount and a click settles what a
 click was never allowed to settle. Remove the seed-before-read and the request naming a
 device between its account and its ledger is a dead one rather than an error anyone
-could read. A final test checks that both halves of every row still exist, so a row
-cannot quietly lose its control and carry on passing.
+could read. Skip the notice that a connection has been closed and one database restart
+ends the session, because every later call is made on a dead socket. A final test checks
+that both halves of every row still exist, so a row cannot quietly lose its control and
+carry on passing.
+
+`tests/test_guardrails.py` holds the six proposal checks to the same standard, one row at
+a time: the invented bill really does settle, the zero-value charge really does land in
+the ledger, the hold card really does ask for the wrong company. Removing the whole guard
+would prove only that a guard does something; removing one rule proves which one did it.
