@@ -81,9 +81,27 @@ def test_a_lost_reply_is_never_reported_as_a_clean_failure():
 def test_approval_floor_rejects_the_wrong_gesture():
     m = machine()
     record = open_proposed(m, amount=12_000)
-    with pytest.raises(Exception, match="held pinch"):
+    with pytest.raises(Exception, match="needs a hold"):
         m.approve(record, "tap")
     assert record.state is PaymentState.PROPOSED
+
+
+def test_a_pointer_hold_settles_the_same_way_a_pinch_does():
+    """The point of the second gesture is the same hold, not a lighter touch."""
+    m = machine()
+    for gesture in ("pinch_hold_1s", "pointer_hold_1s"):
+        record = open_proposed(m, amount=12_000)
+        m.approve(record, gesture)
+        assert record.state is PaymentState.APPROVED
+
+
+def test_a_pointer_tap_is_refused_however_it_is_named():
+    m = machine()
+    for gesture in ("pointer_tap", "pointer_hold", "pointer_hold_0s", "hold_pointer_1s"):
+        record = open_proposed(m, amount=12_000)
+        with pytest.raises(Exception, match="needs a hold"):
+            m.approve(record, gesture)
+        assert record.state is PaymentState.PROPOSED
 
 
 def test_small_payment_needs_no_gesture_at_all():

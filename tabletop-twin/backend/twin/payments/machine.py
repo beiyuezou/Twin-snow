@@ -29,6 +29,12 @@ class PaymentState(str, Enum):
 
 TERMINAL = frozenset({PaymentState.SUCCEEDED, PaymentState.FAILED, PaymentState.CANCELLED})
 
+# The gestures that settle a payment above the approval floor. Each one is a continuous
+# hold of the full approval second, named for the input that made it. No version of a
+# tap is on this list, because a lighter touch is not an easier approval; it is an
+# accident. A new input device joins by name so this list stays readable in review.
+HELD_APPROVAL_GESTURES = frozenset({"pinch_hold_1s", "pointer_hold_1s"})
+
 LEGAL = {
     PaymentState.DRAFT: {PaymentState.PROPOSED, PaymentState.CANCELLED},
     PaymentState.PROPOSED: {PaymentState.APPROVED, PaymentState.CANCELLED},
@@ -140,10 +146,10 @@ class PaymentMachine:
         return self._move(record, PaymentState.CANCELLED, reason)
 
     def approve(self, record: PaymentRecord, gesture: str) -> PaymentRecord:
-        """A gesture is only accepted if it is the one the policy asked for."""
-        if record.amount_cents >= self.approval_floor_cents and gesture != "pinch_hold_1s":
+        """A gesture is only accepted if it is one of the holds the policy asks for."""
+        if record.amount_cents >= self.approval_floor_cents and gesture not in HELD_APPROVAL_GESTURES:
             raise ApprovalRequired(
-                f"{record.amount_cents}c needs a held pinch, not '{gesture}'"
+                f"{record.amount_cents}c needs a hold, not '{gesture}'"
             )
         return self._move(record, PaymentState.APPROVED, f"gesture={gesture}")
 

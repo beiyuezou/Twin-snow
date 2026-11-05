@@ -176,7 +176,7 @@ def evaluate(action: Action, policy: Policy, window: SpendWindow, day: int,
     if action.direction_out and action.amount_cents >= policy.approval_floor_cents:
         return Decision(
             Verdict.REQUIRE_APPROVAL,
-            "above the approval floor: needs a held pinch",
+            "above the approval floor: needs a hold",
             action.id,
             "approval_floor",
             limits,

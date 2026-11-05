@@ -52,9 +52,11 @@ Speech is mirrored as captions on a panel, so the app is complete with sound off
 Every gesture has a ray-clickable equivalent on the panels, with one deliberate
 exception: settling a payment above the approval floor takes a one-second hold, and no
 button on any panel does it. That is the machine's rule, not a missing control — the
-payment state machine refuses an approval whose gesture is not the held pinch and writes
-the refusal down — so the alternative is a different hold (a controller squeeze works)
-rather than a lighter touch. Refusing has a button. Probability, risk and
+payment state machine refuses an approval whose gesture is not one of the two holds it
+names, a pinch near the coin or a pointer pressed on it, and writes the refusal down — so
+the alternative is a different hold rather than a lighter touch. A controller squeeze
+counts, and so does a mouse held down on the coin, which is what makes the rule reachable
+on a screen with no hands in it. Refusing has a button. Probability, risk and
 growth are each carried by two channels — fog density and size, height and
 position relative to the table, garden growth rather than a dial — so colour is
 never the only signal, and the palette is chosen to stay separable for colourblind
@@ -90,10 +92,16 @@ mid-flight. The same run tried to settle a payment with a click instead of a hol
 the machine refused it, so the exception described under Accessibility is measured, not
 intended. Nothing reached the console and no request failed.
 
-What a browser cannot reach is the hand, and what this machine cannot reach is a
-session. The token is picked up by a near grab, and holding the pointer where the coin
-sits produced no request at all, so the one-second pinch and the panel state that only
-appears while a hold is settling remain unproven.
+What this machine cannot reach is a session, and that gap has not moved. What did move is
+the pointer: the coin now answers a pressed pointer held for the full second, and it was
+driven that way in a real browser against a running service. A press of two hundred
+milliseconds on the coin sent nothing at all. A press and hold of the full second sent
+exactly one approval, whose gesture the service recorded as the one a pointer made, and the
+payment settled. The same run then read an **unknown** payment out of the database and asked
+the provider about it once, which left a reconcile entry in the ledger and took the record
+out of the fog. So the one-second hold is proven as far as a mouse can prove it. What
+remains unproven here is the near grab itself, the squeeze that holds it, the panel state
+that only shows while a hold is settling, and how any of this reads from inside a headset.
 
 The managed editor did become command-ready for this pass, and the composition was
 checked with it rather than argued about: three renders of the authored hero view, the

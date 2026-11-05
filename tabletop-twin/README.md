@@ -282,29 +282,54 @@ for the person who has to explain the payment later.
 
 The other half of that decision was checked rather than assumed. A button was put on the
 card to settle a payment with a click, and the machine refused it — the ledger kept an
-approval refusal saying that the amount needs a held pinch and recording the click as
+approval refusal saying that the amount needs a hold and recording the click as
 the gesture that was tried. So the button is gone and the card now says in words what
 the rule is: only a hold settles, and a click can only say no. A lighter touch is not an
-accessibility improvement on a payment; a different hold is, and a controller squeeze is
-a hold.
+accessibility improvement on a payment; a different hold is. Two holds are accepted now,
+each named for the input that made it: a pinch held near the coin, and a pointer pressed
+on it and not lifted. Both are the same second of continuous contact, and a shorter one is
+refused by the same rule whoever made it, so a table with no keyboard and a screen with no
+hands settle a payment the same way and leave the same trace behind.
 
 That browser run is also where a defect nobody had asked for turned up. A request naming
 a device in the moment between its account existing and its ledger landing was handed the
 account with nothing in it, which surfaced as a request that never answered rather than as
 an error anyone could read. It is now waited for, tested from both sides, and gone from
-the log above. Chasing an **unknown** payment on the next heartbeat was observed the same
-way on the build before this change; the client code for it is untouched, but it was not
-re-driven in the run above.
+the log above.
 
 The settlement-rail, currency and background-reconciliation work is covered by the
 service tests and by the client typecheck and build, and the panels that report it are
-now rendered by the running client as above. What a browser cannot do is the hand. The
-token is picked up by a near grab, and a pointer makes nothing happen on it: pressing
-and holding where the coin sits was tried in the run above and produced no request at
-all, so the one-second hold, the state that only shows while a hold is settling, and
-everything about how this table reads from inside a headset remain unproven on this
-machine. The state machine those gestures drive is tested in the service; the gesture
-itself is not.
+rendered by the running client as above.
+
+What a browser could not do before was the hand, so the hand was rebuilt as a second
+input rather than excused. A pointer pressed on the coin and held for the full second now
+settles a payment, and it was driven that way rather than argued: a fresh device world
+with nothing stored, a payment above the approval floor proposed over HTTP, the client's
+own heartbeat surfacing it, then a press of two hundred milliseconds on the coin — which
+asked for nothing at all, because the hold rule does not care how many fingers made it —
+and then a press and hold of the full second, which sent exactly one approval, was answered
+with the payment settled, and left the gesture written in the ledger as the one a pointer
+made. Nothing reached the console in either case.
+
+The same kind of run then chased an **unknown** payment, which had only ever been observed
+on an older build. One settled record was put back to **unknown** while the service was
+stopped, so that the number the client read came out of the database rather than out of a
+test fixture, and the first heartbeat that carried it asked the provider exactly once: one
+reconcile request, a reconcile entry in the ledger beside the approval that had caused it,
+and the record left the fog. What it left the fog *as* is the part worth reading twice.
+The stand-in gateway's own memory is per-process, and the process had been restarted, so
+the provider said it had never seen the charge and the machine wrote **failed** — not the
+**succeeded** the same browser session had produced a few steps earlier. That is the rule
+working, not a bug found: the provider is the authority, and chasing is not the same as
+forgiving. A
+real gateway remembers a captured order across anybody's restart, which is exactly why the
+transport that talks to one is the piece that cannot be pointed at a localhost stand-in by
+way of an environment variable.
+
+What a browser still cannot do is the headset. The token is picked up by a near grab and
+held there by a squeeze, the wheel turns under a hand, and none of that has been watched
+from inside a session on this machine; the state machine underneath all of it is tested in
+the service, and the gestures that drive it are tested as far as a pointer can reach them.
 
 Live immersive evidence was still not captured, but the composition no longer rests on
 argument: the managed editor became command-ready for this pass and the table was measured
@@ -316,10 +341,14 @@ to the standing head rather than to the room, and moved the hero frame's aim ont
 content centre. The scene document reported valid with no warnings on all three renders,
 and the running app boots in a real browser with the surface-placement system registered,
 canvas up, WebXR available and nothing in the console but the GPU driver's own readback
-warnings. The shadow flags on the placed props are the one change these renders cannot
+warnings. The shadows on the props are the one change these renders cannot
 show: the editor draws on black, so a caught shadow has nothing to land on, and that work
 only tells in AR, where the plate is the difference between a miniature resting on a table
-and one floating above it.
+and one floating above it. It now covers the stones, banks, boats, pipes and sprouts that
+the payload grows at runtime as well as the ones the scene document places, because a prop
+drawn from a ledger never passes through the document and has to be introduced to the light
+where it is made. Opaque parts cast; the translucent bank walls only receive, because a
+glass wall that threw a shadow would put a stripe across the whole table.
 
 What never attached here is an XR session. The placement code has not seen a real surface,
 no hit-test source has been granted on this machine, and no claim about headset poses, hand

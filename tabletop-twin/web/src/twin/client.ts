@@ -174,10 +174,11 @@ export interface ModelRoute {
 
 const BASE = (import.meta.env.VITE_TWIN_API ?? 'http://localhost:8000').replace(/\/+$/u, '');
 
-/** The only gesture string the payment state machine will settle with. */
-/** A pinch shorter than this is not an approval. It is an accident. */
+/** A hold shorter than this is not an approval. It is an accident. */
 export const APPROVAL_HOLD_SEC = 1;
 export const APPROVAL_GESTURE = `pinch_hold_${APPROVAL_HOLD_SEC}s`;
+/** The same hold, made with a pointer on a screen instead of a hand in a headset. */
+export const POINTER_GESTURE = `pointer_hold_${APPROVAL_HOLD_SEC}s`;
 
 export interface Account {
   token: string;

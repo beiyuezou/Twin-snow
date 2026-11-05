@@ -48,7 +48,7 @@ CORPUS = (
     ("stuck_unknown", "a payment whose provider never answered"),
     ("rail_unreachable", "a rail that cannot deliver to the recipient's country"),
     ("invented_figure", "a streamed sentence with a number nobody computed"),
-    ("click_as_approval", "a click offered in place of a held pinch"),
+    ("click_as_approval", "a click offered in place of a hold"),
     ("ledger_not_landed", "a request naming an account whose ledger has not landed"),
     ("dropped_connection", "a database socket that the server closed mid-session"),
 )
@@ -206,7 +206,7 @@ def test_click_as_approval_known_answer(client, headers):
     entries = client.get("/v1/audit?limit=200", headers=headers).json()["entries"]
     kept = [e for e in entries if e["kind"] == "approval_refused"]
     assert [e["gesture"] for e in kept] == ["panel_click"], "the attempt is kept, not swallowed"
-    assert client.get("/v1/world", headers=headers).json()["payments"], "still waiting for a hand"
+    assert client.get("/v1/world", headers=headers).json()["payments"], "still waiting for a hold"
 
 
 def test_click_as_approval_without_the_guard():

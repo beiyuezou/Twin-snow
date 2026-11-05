@@ -1,14 +1,15 @@
 /**
- * Hands are the only controller this app has.
+ * Hands and a pointer are this app's only controllers.
  *
  * Each gesture maps to one documented IWSDK interaction and one backend call:
  * twist the wheel (proximity grab, rotate only), pull the ribbon or a pipe (ray
- * grab with spring-back), and hold the approval token for a full second.
- * A gesture never executes anything — it only ever asks.
+ * grab with spring-back), and hold the approval token for a full second — with a
+ * pinch in a headset or a pressed pointer on a screen. A gesture never executes
+ * anything: it only ever asks.
  */
 
-import { Grabbed, Object3D, UIKit, createSystem, type Entity, type UIKitMLAsset } from '@iwsdk/core';
-import { APPROVAL_GESTURE, APPROVAL_HOLD_SEC } from './client.js';
+import { Grabbed, Object3D, Pressed, UIKit, createSystem, type Entity, type UIKitMLAsset } from '@iwsdk/core';
+import { APPROVAL_GESTURE, APPROVAL_HOLD_SEC, POINTER_GESTURE } from './client.js';
 import { twin } from './controller.js';
 import { ApprovalPrompt, ForkRibbon, SubscriptionPipe, TimeWheel } from './components.js';
 
@@ -24,6 +25,7 @@ export class TwinHandsSystem extends createSystem({
   heldPipes: { required: [SubscriptionPipe, Grabbed] },
   tokens: { required: [ApprovalPrompt] },
   heldTokens: { required: [ApprovalPrompt, Grabbed] },
+  aimedTokens: { required: [ApprovalPrompt, Pressed] },
 }) {
   private origins = new Map<Entity, number>();
   private travelled = new Map<Entity, number>();
@@ -39,6 +41,12 @@ export class TwinHandsSystem extends createSystem({
     }
     this.stopping.push(
       this.queries.heldTokens.subscribe('disqualify', (entity: Entity) => {
+        entity.setValue(ApprovalPrompt, 'hold', 0);
+        entity.setValue(ApprovalPrompt, 'armed', false);
+      }),
+    );
+    this.stopping.push(
+      this.queries.aimedTokens.subscribe('disqualify', (entity: Entity) => {
         entity.setValue(ApprovalPrompt, 'hold', 0);
         entity.setValue(ApprovalPrompt, 'armed', false);
       }),
@@ -103,16 +111,22 @@ export class TwinHandsSystem extends createSystem({
     void twin.fork(`shift ${target.label} by a week`, [], { [target.event_id]: 7 });
   }
 
-  /** One second of held pinch is the whole gesture; anything less changes nothing. */
+  /** One second of continuous contact is the whole gesture; anything less changes nothing. */
   private holdTokens(delta: number): void {
-    for (const entity of this.queries.heldTokens.entities) {
+    const held = new Set<Entity>(this.queries.heldTokens.entities);
+    for (const entity of this.queries.aimedTokens.entities) held.add(entity);
+    if (held.size === 0) return;
+    // The ledger has to say which hand made the hold. In a browser the pointer is the
+    // only thing that can hold anything, even when the SDK delivers it as a grab.
+    const gesture = this.world.xrSession ? APPROVAL_GESTURE : POINTER_GESTURE;
+    for (const entity of held) {
       const hold = (entity.getValue(ApprovalPrompt, 'hold') ?? 0) + delta;
       entity.setValue(ApprovalPrompt, 'hold', hold);
       const armed = entity.getValue(ApprovalPrompt, 'armed') ?? false;
       if (armed || hold < APPROVAL_HOLD_SEC) continue;
       entity.setValue(ApprovalPrompt, 'armed', true);
       const action = twin.pending;
-      if (action) void twin.approve(action.action_id, APPROVAL_GESTURE);
+      if (action) void twin.approve(action.action_id, gesture);
     }
   }
 

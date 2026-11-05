@@ -30,7 +30,7 @@ def test_each_step_has_a_slug_the_client_can_address():
 def test_the_prohibitions_are_parsed_out_of_the_prose():
     persona = load_persona()
     assert any("Invent a number" in line for line in persona.prohibitions)
-    assert any("held pinch" in line for line in persona.prohibitions)
+    assert any("one-second hold" in line for line in persona.prohibitions)
 
 
 def test_the_voice_prompt_carries_the_personality_text():

@@ -76,6 +76,15 @@ export class TwinWorldSystem extends createSystem({
     if (existing) return existing;
     const object = await this.world.assets.instantiate<Object3D>(assetId);
     object.name = key;
+    // A prop drawn at runtime never passes through the scene document, so the light
+    // has to be told about it here. Opaque parts cast; translucent ones only receive,
+    // because a glass bank wall would otherwise put a shadow across the whole table.
+    object.traverse((child) => {
+      if (!(child instanceof Mesh)) return;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      child.castShadow = !materials.some((m) => (m as { transparent?: boolean }).transparent === true);
+      child.receiveShadow = true;
+    });
     const parent = this.containers.get(container) ?? this.rootEntity;
     const entity = this.world.createTransformEntity(object, parent);
     const handle = { entity, object };

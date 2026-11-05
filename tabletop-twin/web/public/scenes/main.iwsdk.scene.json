@@ -124,6 +124,7 @@
           "transform": { "position": [0.16, 0.008, 0.24] },
           "components": {
             "ApprovalPrompt": { "hold": 0, "armed": false },
+            "RayInteractable": {},
             "OneHandGrabbable": { "rotate": false, "translate": true }
           }
         },
