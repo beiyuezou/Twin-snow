@@ -76,6 +76,27 @@ export interface Payment {
   verified: boolean;
 }
 
+/**
+ * The twin's own week, folded from the trail of decisions it has already made.
+ *
+ * Every figure here is a count of ledger rows, not a model's recollection, so the
+ * panel can say "3 asks this week" and mean it. A `said` sentence is included
+ * because the same fold is what the summary endpoint reads.
+ */
+export interface Memory {
+  window_days: number;
+  asks_this_week: number;
+  moves_this_week: number;
+  settled_cents_this_week: number;
+  refused_this_week: number;
+  held_gestures_refused_this_week: number;
+  unresolved_payments: number;
+  asks_today: number;
+  moves_today: number;
+  top_denied_rule: string;
+  said: string;
+}
+
 export interface ScenePayload {
   meta: {
     persona: string;
@@ -109,6 +130,7 @@ export interface ScenePayload {
   };
   branches: Branch[];
   payments: Payment[];
+  memory: Memory;
   focus: string;
   twin: { look_at: string; speak: string };
 }
@@ -170,6 +192,75 @@ export interface ModelRoute {
   supplied_by: Record<string, string>;
   assumed: string[];
   preferred: boolean;
+}
+
+/**
+ * The audit firm, as the backend describes it.
+ *
+ * Every figure on these two types is one the corpus was read out of or a review
+ * computed, so the panel has nothing to round, add up or work out for itself —
+ * least of all the number of roles it hired, which is a fact about a chain.
+ */
+export interface FirmRoute {
+  route: string;
+  why: string;
+}
+
+export interface FirmChain {
+  on_chain: boolean;
+  why: string;
+}
+
+export interface FirmBrief {
+  roles: { role: string; title: string; principal: string }[];
+  engagements: number;
+  thresholds: { name: string; value: number | null; state: string; celex: string; article: string }[];
+  uncalibrated: string[];
+  provenance: { derived_from: Record<string, unknown>; corpus_dir: string };
+  model_route: FirmRoute;
+  chain: FirmChain;
+}
+
+/** One agent's answer, in the shape the review endpoint returns it. */
+export interface Finding {
+  role: string;
+  to_role: string;
+  asks: string;
+  verdict: string;
+  sentence: string;
+  numbers: Record<string, unknown>;
+  cite: Record<string, string>;
+  route: string;
+  binding: boolean;
+}
+
+/** What the contract made of one attempt to send a message. */
+export interface OpenedAgreement {
+  role: string;
+  to_role: string;
+  verdict: string;
+  agreement: string;
+  state: string;
+  steps: { verb: string; ok: boolean; state: string; refused: string }[];
+}
+
+export interface FirmReview {
+  client: string;
+  route: FirmRoute;
+  findings: Finding[];
+  counts: Record<string, number>;
+  agreements: OpenedAgreement[];
+  waiting_on_humans: unknown[];
+  chain: FirmChain;
+  why_no_agreements?: string;
+}
+
+/** How the boot probe found the firm, said without asking the sidecar again. */
+export interface FirmHealth {
+  on_chain: boolean;
+  why: string;
+  hired: number;
+  refused: number;
 }
 
 const BASE = (import.meta.env.VITE_TWIN_API ?? 'http://localhost:8000').replace(/\/+$/u, '');
@@ -357,6 +448,7 @@ export const twinApi = {
     heartbeat_unwired: string[];
     paypal_configured: boolean;
     accounts: boolean;
+    audit: FirmHealth;
   }>('/v1/health'),
   persona: () => get<{
     name: string;
@@ -381,4 +473,14 @@ export const twinApi = {
       reason: 'refused from the panel',
     }),
   reconcile: (action_id: string) => post<{ action_id: string; state: string }>('/v1/reconcile', { action_id }),
+
+  /**
+   * The audit firm. `brief` needs no chain and writes nothing; `review` is the one
+   * call that can put an agreement on a contract, so it is only ever made from a
+   * button a hand chose to press.
+   */
+  firm: () => get<FirmBrief>('/v1/firm'),
+  firmReview: (engagement: number) => post<FirmReview>('/v1/firm/review', { engagement }),
+  firmAgreements: () => get<{ agreements: { id: string; state: string }[]; waiting_on_humans: unknown[]; chain: FirmChain }>(
+    '/v1/firm/agreements'),
 };

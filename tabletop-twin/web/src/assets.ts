@@ -46,5 +46,6 @@ export default defineAssets({
   'twin-captions': uikitml('captions.uikitml', 'Captions'),
   'twin-approve': uikitml('approve.uikitml', 'Approval prompt'),
   'twin-rails': uikitml('rails.uikitml', 'Settlement rails'),
+  'twin-firm': uikitml('firm.uikitml', 'Audit firm readout'),
   'twin-wheel-plate': uikitml('wheel.uikitml', 'Time wheel readout'),
 });

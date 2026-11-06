@@ -7,6 +7,7 @@
 
 import { World } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
+import { TwinFirmSystem } from './twin/firm.js';
 import { TwinHandsSystem } from './twin/hands.js';
 import { TwinPlacementSystem } from './twin/placement.js';
 import { TwinVoiceSystem } from './twin/voice.js';
@@ -20,4 +21,5 @@ World.create(
   world.registerSystem(TwinHandsSystem);
   world.registerSystem(TwinPlacementSystem);
   world.registerSystem(TwinVoiceSystem);
+  world.registerSystem(TwinFirmSystem);
 });

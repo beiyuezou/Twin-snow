@@ -21,7 +21,7 @@ import {
   heightFor,
   segmentDay,
 } from './layout.js';
-import { BillStone, CashBranch, LateBoat, RiverFlow, SubscriptionPipe, TwinState } from './components.js';
+import { BillStone, CashBranch, LateBoat, Moods, RiverFlow, SubscriptionPipe, TableVoice, TwinOrb, TwinState } from './components.js';
 
 interface Handle {
   entity: Entity;
@@ -32,6 +32,8 @@ const CONTAINERS = ['banks', 'stones', 'boats', 'pipes', 'garden', 'branches'] a
 
 export class TwinWorldSystem extends createSystem({
   worlds: { required: [TwinState] },
+  orbs: { required: [TwinOrb] },
+  voices: { required: [TableVoice] },
 }) {
   private root!: Object3D;
   private rootEntity!: Entity;
@@ -113,6 +115,13 @@ export class TwinWorldSystem extends createSystem({
     await this.drawGarden(payload);
     await this.drawBranches(payload);
     this.drawWater(payload, scale);
+    // The twin's own record belongs on the orb, not only on a card: one component
+    // holding the figure is what stops the panel and the miniature disagreeing about
+    // a score neither of them worked out.
+    for (const entity of this.queries.orbs.entities) {
+      entity.setValue(TwinOrb, 'accuracyPct', payload.garden.accuracy_pct);
+      entity.setValue(TwinOrb, 'resolved', payload.garden.resolved);
+    }
   }
 
   /**
@@ -269,6 +278,11 @@ export class TwinWorldSystem extends createSystem({
 
   update(delta: number): void {
     this.clock += delta;
+    // Offline means every figure on this table is as old as the last answer. Water
+    // that keeps rippling would make a frozen miniature look live.
+    for (const entity of this.queries.voices.entities) {
+      if (entity.getValue(TableVoice, 'mood') === Moods.offline) return;
+    }
     this.water.position.y = 0.012 + Math.sin(this.clock * 0.8) * 0.0012;
   }
 }

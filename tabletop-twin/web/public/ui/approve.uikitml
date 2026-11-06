@@ -74,6 +74,19 @@
       color: #f2e8c9;
       text-align: left;
     }
+    .gauge {
+      display: flex;
+      flex-direction: row;
+      gap: 1.2;
+    }
+    .seg {
+      width: 9.2;
+      height: 1.8;
+      background-color: #1a222c;
+      border-color: #4a5f74;
+      border-width: 0.4;
+      border-radius: 0.9;
+    }
     .reject {
       font-size: 2.4;
       font-weight: 600;
@@ -98,6 +111,13 @@
   <span id="ApproveTo" class="to">nobody yet</span>
   <span id="ApproveWhy" class="why">The policy engine has not named a reason.</span>
   <span id="ApproveRule" class="rule">rule: none</span>
-  <span class="hint">Only a one-second hold on the coin settles it. This button says no.</span>
+  <span class="gauge">
+    <span id="Gauge0" class="seg"></span>
+    <span id="Gauge1" class="seg"></span>
+    <span id="Gauge2" class="seg"></span>
+    <span id="Gauge3" class="seg"></span>
+    <span id="Gauge4" class="seg"></span>
+  </span>
+  <span id="ApproveGauge" class="hint">Only a one-second hold on the coin settles it. This button says no.</span>
   <button id="Btn-reject" class="reject">Reject</button>
 </div>

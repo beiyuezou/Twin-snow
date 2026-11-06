@@ -135,7 +135,8 @@
           "content": { "type": "asset", "asset": "twin-orb", "receiveShadow": true },
           "transform": { "position": [0.34, 0.16, 0.24] },
           "components": {
-            "TwinOrb": { "mood": "idle", "accuracyPct": 0 }
+            "TwinOrb": { "mood": "idle", "accuracyPct": 0, "resolved": 0 },
+            "TableVoice": { "mood": "idle", "holdPct": 0, "waitingOn": 0 }
           }
         },
         {
@@ -165,6 +166,28 @@
           "content": { "type": "asset", "asset": "twin-rails" },
           "transform": { "position": [-0.86, 0.48, -0.34], "rotationDeg": [-11, 24, 0] },
           "components": {
+            "RayInteractable": {}
+          }
+        },
+        {
+          "id": "firm",
+          "name": "Firm Panel",
+          "framingRole": "support",
+          "content": { "type": "asset", "asset": "twin-firm" },
+          "transform": { "position": [-0.86, 1.04, -0.3], "rotationDeg": [-14, 24, 0] },
+          "components": {
+            "FirmPanel": {
+              "onChain": false,
+              "hired": 0,
+              "refusedRoles": 0,
+              "derived": 0,
+              "figures": 0,
+              "engagement": -1,
+              "engagements": 0,
+              "opened": 0,
+              "refusedWrites": 0,
+              "waiting": 0
+            },
             "RayInteractable": {}
           }
         },

@@ -7,7 +7,7 @@
  */
 
 import { session, twinApi } from './client.js';
-import type { Caption, Fork, Held, ScenePayload, Verdict } from './client.js';
+import type { Caption, FirmBrief, FirmHealth, FirmReview, Fork, Held, ScenePayload, Verdict } from './client.js';
 
 type Listener = () => void;
 
@@ -22,10 +22,24 @@ class TwinController {
   settling: string | null = null;
   captions: Caption[] = [];
   offline = false;
+  /** Requests the twin has been asked and has not answered. A slow table is a state. */
+  inFlight = 0;
+  /** The payment whose provider is being asked right now, or nothing is. */
+  chasing: string | null = null;
   route = '';
   /** False while the route is only what the environment says it would be. */
   routeMeasured = true;
   account = '';
+  /** What the firm says it is: twelve roles, the figures they quote, and what they stand on. */
+  firm: FirmBrief | null = null;
+  /** How the boot probe found the contract, if it reached one. */
+  firmHealth: FirmHealth | null = null;
+  /** The last engagement put to the firm, and the answers it gave. */
+  firmReview: FirmReview | null = null;
+  firmIndex = 0;
+  /** Which engagement the answer above is about, once there is one. */
+  firmAsked = -1;
+  firmBusy = false;
   private chased = new Set<string>();
   private joining: Promise<boolean> | null = null;
   private listeners = new Set<Listener>();
@@ -86,13 +100,22 @@ class TwinController {
     }
   }
 
+  /**
+   * Every request goes through here, so the count of unanswered ones is a fact about
+   * this class rather than something each caller remembers to set. The `finally` is the
+   * point: a request that throws still stops being in flight.
+   */
   private async call<T>(run: () => Promise<T>, fallback: T): Promise<T> {
+    this.inFlight += 1;
+    this.emit();
     try {
       return await run();
     } catch {
       this.offline = true;
-      this.emit();
       return fallback;
+    } finally {
+      this.inFlight -= 1;
+      this.emit();
     }
   }
 
@@ -143,10 +166,11 @@ class TwinController {
 
   async boot(): Promise<void> {
     await this.joinWorld();
-    const [world, health, me] = await Promise.all([
+    const [world, health, me, firm] = await Promise.all([
       this.call(() => twinApi.world(), null as ScenePayload | null),
       this.call(() => twinApi.health(), null),
       this.call(() => twinApi.me(), null),
+      this.call(() => twinApi.firm(), null),
     ]);
     if (world) this.payload = world;
     // A world nobody has named yet is still somebody's table, and the twin is the
@@ -155,7 +179,9 @@ class TwinController {
     if (health) {
       this.route = health.route;
       this.routeMeasured = health.route_is_measured;
+      this.firmHealth = health.audit;
     }
+    if (firm) this.firm = firm;
     this.offline = !world;
     this.emit();
   }
@@ -224,11 +250,45 @@ class TwinController {
     return result.state;
   }
 
+  /** Asking a provider what happened to a payment is a state the table has to show. */
   async reconcile(actionId: string): Promise<void> {
-    const result = await this.call(() => twinApi.reconcile(actionId), null);
-    if (!result) return;
-    this.say('reconcile', `Asked the provider about that one again. It is ${result.state}.`, actionId);
-    await this.refresh();
+    this.chasing = actionId;
+    this.emit();
+    try {
+      const result = await this.call(() => twinApi.reconcile(actionId), null);
+      if (!result) return;
+      this.say('reconcile', `Asked the provider about that one again. It is ${result.state}.`, actionId);
+      await this.refresh();
+    } finally {
+      this.chasing = null;
+      this.emit();
+    }
+  }
+
+  /**
+   * Put the next engagement to the twelve agents and write down what they bind
+   * each other to.
+   *
+   * The rotation moves only when the review answered. An index that advanced past a
+   * failed request would skip a case, and the whole point of walking the corpus is
+   * that every one of its boundaries gets asked about once.
+   */
+  async askFirm(): Promise<void> {
+    this.firmBusy = true;
+    this.emit();
+    try {
+      const result = await this.call(() => twinApi.firmReview(this.firmIndex), null);
+      if (!result) return;
+      this.firmReview = result;
+      this.firmAsked = this.firmIndex;
+      const opened = result.agreements.filter((agreement) => agreement.state === 'Attested').length;
+      this.say('firm', `${result.client}: ${opened} of ${result.agreements.length} binding findings became agreements.`);
+      const total = this.firm?.engagements ?? 0;
+      this.firmIndex = total > 0 ? (this.firmIndex + 1) % total : 0;
+    } finally {
+      this.firmBusy = false;
+      this.emit();
+    }
   }
 
   /** A line the twin said in this app, in the same shape the heartbeat returns. */
