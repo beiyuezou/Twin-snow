@@ -12,17 +12,20 @@ in later claims that same world rather than starting a second one beside it.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import queue
 import threading
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
+from twin.audit import service as firm_service
 from twin.domain.events import event_from_dict
 from twin.payments.machine import IllegalTransition, TERMINAL
 from twin.payments.paypal import PayPalConfig, PayPalTransport, SandboxTransport
@@ -32,7 +35,7 @@ from twin.payments.rails import SANDBOX_RAIL, load_catalog
 from twin.store import Store
 from twin.world import reconcile
 from twin.world.heartbeat import advance, unwired
-from twin.world.memory import summarise
+from twin.world.memory import WINDOWS, summarise
 from twin.world.scene import scene_payload
 from twin.world.session import Session
 
@@ -69,6 +72,7 @@ def reset_state() -> None:
         _store.close()
     _store = None
     _demo = None
+    firm_service.reset()
 
 
 def demo_session() -> Session:
@@ -95,6 +99,11 @@ DEVICE_HEADER = "X-Twin-Device"
 # table. A short one is read as absent rather than trusted, because a headset with a
 # six-character id is an invitation, not a credential.
 DEVICE_MIN_LEN, DEVICE_MAX_LEN = 32, 128
+
+# An executive figure reads deeper than the twin's own working memory: a session holds
+# MEMORY_ROWS so a planner can be told what it just did, and a summary is asked about a
+# quarter's worth of decisions. Two different questions, so two different windows.
+SUMMARY_ROWS = 500
 
 
 def device_key(request: Request) -> str:
@@ -145,9 +154,17 @@ def world_of(user_id: str = Depends(current_user)) -> Session:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Background reconciliation is opt-in: it needs a transport that can answer a lookup."""
+    """Background reconciliation is opt-in: it needs a transport that can answer a lookup.
+
+    The audit firm is opened the same way. A sidecar named by `TWIN_CHAIN_URL` is probed once
+    here and the twelve roles are put on it, so the first review of the day writes agreements
+    instead of racing a registration. No url, or no answer, costs one short timeout at boot and
+    is then said by every endpoint that needs a chain - because a firm that cannot reach its
+    contract still has an opinion, and hiding that is worse than reporting it.
+    """
     global _reconciler
     _reconciler = reconcile.start(store())
+    firm_service.service().chain()
     try:
         yield
     finally:
@@ -257,6 +274,46 @@ class RailIn(BaseModel):
     rail: str = Field(min_length=1, max_length=32)
 
 
+class EngagementIn(BaseModel):
+    """One engagement to put in front of the firm: an index into the derived cases, plus the
+    figures this client's file says differently.
+
+    The bounds are on the shape of a figure, never on what it means. The thresholds belong to the
+    corpus, so a caller that sends 70.0001 % of an audit fee is not told it is under the cap —
+    and a caller cannot send a threshold at all.
+    """
+
+    engagement: int = Field(ge=0)
+    audit_fee_cents: int | None = Field(default=None, ge=0, le=100_000_000_000)
+    non_audit_fee_cents: int | None = Field(default=None, ge=0, le=100_000_000_000)
+    non_audit_services: list[Annotated[str, Field(min_length=1, max_length=120)]] | None = Field(
+        default=None, max_length=8)
+    firm_fee_from_client_cents: int | None = Field(default=None, ge=0, le=100_000_000_000)
+    firm_total_fees_cents: int | None = Field(default=None, ge=0, le=100_000_000_000)
+    is_pie: bool | None = None
+    is_group: bool | None = None
+    turnover_eur: float | None = Field(default=None, ge=0, le=1e14)
+    balance_sheet_eur: float | None = Field(default=None, ge=0, le=1e14)
+    employees: float | None = Field(default=None, ge=0, le=1e8)
+    parent_holding_percent: float | None = Field(default=None, ge=0, le=100)
+    years_auditing: int | None = Field(default=None, ge=0, le=99)
+    partner_years: int | None = Field(default=None, ge=0, le=99)
+    previously_audited: bool | None = None
+    years_since_previous: int | None = Field(default=None, ge=0, le=99)
+    tender_held: bool | None = None
+    kyc_checked_years_ago: int | None = Field(default=None, ge=0, le=99)
+    file_retention_years: int | None = Field(default=None, ge=0, le=99)
+
+    def changes(self) -> dict:
+        """Only the figures somebody actually sent, so an untouched one stays the derived one."""
+        changes = self.model_dump(exclude_unset=True, exclude={"engagement"})
+        # JSON has no tuple. Left as a list it would sit in a field the engagement declares as
+        # one, and a frozen dataclass holding a list cannot be hashed.
+        if "non_audit_services" in changes:
+            changes["non_audit_services"] = tuple(changes["non_audit_services"] or ())
+        return changes
+
+
 # ------------------------------------------------------------------- accounts
 
 
@@ -353,6 +410,7 @@ def health() -> dict:
         "rails_compiled_on": load_catalog().compiled_on,
         "reconciler": _reconciler.status() if _reconciler else {"running": False, "reason": reconciler_refusal()},
         "accounts": True,
+        "audit": firm_service.service().health(),
     }
 
 
@@ -685,13 +743,21 @@ def audit(limit: int = 50, user_id: str = Depends(current_user)) -> dict:
 
 
 @app.get("/v1/summary")
-def summary(s: Session = Depends(world_of), user_id: str = Depends(current_user)) -> dict:
+def summary(window: str = "all", s: Session = Depends(world_of), user_id: str = Depends(current_user)) -> dict:
+    """What the trail says, over the whole history or only over the days being asked about.
+
+    A bad window name is a 422 rather than a silent fall back to *all*: an executive
+    figure that quietly stopped being about today is the kind of number nobody notices.
+    """
+    if window not in WINDOWS:
+        raise HTTPException(status_code=422, detail=f"'{window}' is not one of {sorted(WINDOWS)}")
     unresolved = sum(1 for r in s.machine.all() if r.state not in TERMINAL)
     return summarise(
-        store().read_log(user_id, limit=500),
+        store().read_log(user_id, limit=SUMMARY_ROWS),
         persona=s.persona.name,
         day=s.day,
         open_payments=unresolved,
+        window=window,
     )
 
 
@@ -731,3 +797,63 @@ def persona(s: Session = Depends(world_of)) -> dict:
             for step in s.persona.steps
         ],
     }
+
+
+# ------------------------------------------------------------ the audit firm
+#
+# These routes are the only place the firm is reachable from a table. They are deliberately
+# shaped like the rest of the service: a reply that cannot do a thing says why rather than
+# returning an empty list, because an empty agreement list is indistinguishable from a firm
+# that opened none.
+
+
+@app.get("/v1/firm")
+def firm() -> dict:
+    """Who is hired, on what numbers, standing on what. No world, no writes, no key needed."""
+    return firm_service.brief()
+
+
+@app.get("/v1/firm/engagements")
+def firm_engagements() -> dict:
+    """The engagements the derived thresholds make interesting, with every figure they hold."""
+    return {"engagements": [firm_service.engagement_card(index, case)
+                            for index, case in enumerate(firm_service.engagements())]}
+
+
+@app.post("/v1/firm/review")
+def firm_review(body: EngagementIn, user_id: str = Depends(current_user),
+                s: Session = Depends(world_of)) -> dict:
+    """Twelve agents answer one engagement, and what they bind each other to is written down."""
+    cases = firm_service.engagements()
+    if body.engagement >= len(cases):
+        raise HTTPException(status_code=422,
+                            detail=f"engagement {body.engagement} is past the end of a corpus "
+                                   f"with {len(cases)} cases")
+    case = dataclasses.replace(cases[body.engagement], **body.changes())
+    return firm_service.service().review(case, store(), user_id, s.day)
+
+
+@app.get("/v1/firm/agreements")
+def firm_agreements() -> dict:
+    """What the contract holds, and which of it is waiting on a human signature."""
+    return firm_service.service().agreements()
+
+
+@app.get("/v1/firm/transcript")
+def firm_transcript(limit: int = 60, role: str = "", user_id: str = Depends(current_user),
+                    s: Session = Depends(world_of)) -> dict:
+    """Every message this world's agents sent, including the attempts the contract refused."""
+    bus = firm_service.service().bus(store(), user_id, s.day)
+    if bus is None:
+        return {"messages": [], "chain": firm_service.service().health()}
+    rows = bus.transcript(limit=min(max(limit, 1), 500), role=role or None)
+    return {"messages": rows, "count": len(rows)}
+
+
+@app.get("/v1/firm/inbox")
+def firm_inbox(role: str, after: int = 0) -> dict:
+    """One agent's mail, as the chain emitted it, from a transaction cursor onwards."""
+    hired = {agent["role"] for agent in firm_service.roster().get("agents") or []}
+    if role not in hired:
+        raise HTTPException(status_code=422, detail=f"'{role}' is not a role on the roster")
+    return firm_service.service().inbox(role, max(after, 0))

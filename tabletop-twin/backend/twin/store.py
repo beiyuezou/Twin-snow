@@ -165,7 +165,39 @@ TABLES = (
       created_at DOUBLE PRECISION NOT NULL
     )
     """,
+    # A readable copy of what the agents said to each other. The chain is the authority on
+    # whether an agreement exists and what state it is in; this is the projection the panels
+    # and the API read without walking a journal, and it is allowed to be behind, never
+    # ahead. Each row carries the state the message it mirrors produced, not the state that
+    # agreement is in now, and rows are never updated: this table is the record of what each
+    # agent tried to do, including the attempts the contract refused.
+    """
+    CREATE TABLE IF NOT EXISTS agent_message (
+      user_id TEXT NOT NULL,
+      delivery_id TEXT NOT NULL,
+      agreement TEXT NOT NULL DEFAULT '',
+      seq BIGINT NOT NULL DEFAULT 0,
+      verb TEXT NOT NULL,
+      from_role TEXT NOT NULL,
+      to_role TEXT NOT NULL,
+      subject TEXT NOT NULL DEFAULT '',
+      terms TEXT NOT NULL DEFAULT '',
+      terms_hash TEXT NOT NULL DEFAULT '',
+      evidence_hash TEXT NOT NULL DEFAULT '',
+      amount_cents BIGINT NOT NULL DEFAULT 0,
+      non_audit_cents BIGINT NOT NULL DEFAULT 0,
+      state TEXT NOT NULL,
+      refusal TEXT NOT NULL DEFAULT '',
+      reason TEXT NOT NULL DEFAULT '',
+      gas_used BIGINT NOT NULL DEFAULT 0,
+      tick INTEGER NOT NULL DEFAULT 0,
+      day INTEGER NOT NULL DEFAULT 0,
+      created_at DOUBLE PRECISION NOT NULL,
+      PRIMARY KEY (user_id, delivery_id)
+    )
+    """,
     "CREATE INDEX IF NOT EXISTS log_user ON action_log (user_id, seq)",
+    "CREATE INDEX IF NOT EXISTS message_agreement ON agent_message (user_id, agreement, seq)",
     "CREATE INDEX IF NOT EXISTS token_user ON access_token (user_id)",
 )
 
@@ -739,6 +771,38 @@ class Store:
             }
             for row in rows
         ]
+
+    # -------------------------------------------------------------- agent traffic
+
+    def save_agent_message(self, user_id: str, row: dict) -> None:
+        """Mirror one delivery. Repeat calls are ignored: a delivery happened once or it did not."""
+        self._do(lambda conn: conn.execute(
+            "INSERT INTO agent_message (user_id, delivery_id, agreement, seq, verb, from_role, to_role,"
+            " subject, terms, terms_hash, evidence_hash, amount_cents, non_audit_cents, state, refusal, reason,"
+            " gas_used, tick, day, created_at)"
+            " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+            " ON CONFLICT (user_id, delivery_id) DO NOTHING",
+            (user_id, row["delivery_id"], row.get("agreement", ""), int(row.get("seq") or 0), row["verb"],
+             row["from_role"], row["to_role"], row.get("subject", ""), row.get("terms", ""),
+             row.get("terms_hash", ""), row.get("evidence_hash", ""),
+             int(row.get("amount_cents") or 0), int(row.get("non_audit_cents") or 0),
+             row["state"], row.get("refusal", ""), row.get("reason", ""), int(row.get("gas_used") or 0),
+             int(row.get("tick") or 0), int(row.get("day") or 0), time.time()),
+        ))
+
+    def agent_messages(self, user_id: str, limit: int = 60, role: str | None = None) -> list[dict]:
+        """Newest first, optionally only the ones a given role was party to."""
+        if role:
+            rows = self._do(lambda conn: conn.execute(
+                "SELECT * FROM agent_message WHERE user_id = %s AND (from_role = %s OR to_role = %s)"
+                " ORDER BY created_at DESC, seq DESC LIMIT %s", (user_id, role, role, limit)
+            ).fetchall())
+        else:
+            rows = self._do(lambda conn: conn.execute(
+                "SELECT * FROM agent_message WHERE user_id = %s ORDER BY created_at DESC, seq DESC LIMIT %s",
+                (user_id, limit)
+            ).fetchall())
+        return [dict(row) for row in rows]
 
     # -------------------------------------------------------------- connections
 
