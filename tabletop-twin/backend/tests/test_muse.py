@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from fake_muse import CHAT_PATH, MODEL, RESPONSES_PATH, FakeMuse, read_sse
 from twin.api import main
+from twin.planner.muse import function_calls, text_of
 from twin.planner.model import (
     CHAT,
     MUSE,
@@ -506,3 +507,16 @@ def test_muse_is_reachable_by_its_published_defaults_alone(monkeypatch):
     assert route["host"] == "api.meta.ai"
     assert route["endpoint"] == f"{MUSE_BASE_URL}/responses"
     assert route["model"] == MUSE_MODEL
+
+
+def test_a_responses_reply_with_no_function_call_reads_as_empty():
+    """`choices` is a chat field, so a responses payload has none and must never be indexed blindly.
+
+    This crashed the first time a Muse reply arrived as prose instead of a tool call, which is
+    ordinary behaviour when `tool_choice` is only "auto".
+    """
+    assert function_calls({"output": []}) == []
+    assert text_of({"output": [{"type": "message",
+                                "content": [{"type": "output_text", "text": "hello"}]}]}) == "hello"
+    assert text_of({"output": []}) == ""
+    assert function_calls({"output": [{"type": "message", "content": "words"}]}) == []

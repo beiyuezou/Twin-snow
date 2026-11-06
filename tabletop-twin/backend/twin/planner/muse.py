@@ -122,6 +122,17 @@ def chat_body(model: str, messages: list[dict], *, tools: list | None = None, to
     return body
 
 
+def _message_of(payload: dict) -> dict:
+    """The first choice's message of a chat-shaped reply, and never an IndexError.
+
+    A `/v1/responses` payload has no `choices` at all, so reading the first one blindly turned every
+    call-less reply into a crash rather than an empty answer. Both readers below go through this.
+    """
+    choices = payload.get("choices") or []
+    first = choices[0] if choices else None
+    return (first.get("message") if isinstance(first, dict) else None) or {}
+
+
 def function_calls(payload: dict) -> list[dict]:
     """Every function call in one reply, from either shape.
 
@@ -134,9 +145,7 @@ def function_calls(payload: dict) -> list[dict]:
         calls = [item for item in output if isinstance(item, dict) and item.get("type") == "function_call"]
         if calls:
             return calls
-    choices = payload.get("choices") or []
-    message = (choices[0].get("message") if isinstance(choices[0], dict) else None) or {}
-    return list(message.get("tool_calls") or [])
+    return list(_message_of(payload).get("tool_calls") or [])
 
 
 def text_of(payload: dict) -> str:
@@ -153,8 +162,7 @@ def text_of(payload: dict) -> str:
         elif isinstance(item.get("text"), str):
             parts.append(item["text"])
     if not parts:
-        choices = payload.get("choices") or []
-        message = (choices[0].get("message") if isinstance(choices[0], dict) else None) or {}
+        message = _message_of(payload)
         if isinstance(message.get("content"), str):
             parts.append(message["content"])
     return "\n".join(part for part in parts if part).strip()
