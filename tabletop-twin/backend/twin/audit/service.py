@@ -22,8 +22,8 @@ from typing import Any
 from twin.audit.a2a import Bus
 from twin.audit.agents import Case, Firm, Priors
 from twin.audit.chain import Chain, describe, roster
+from twin.audit.corpus import corpus_place
 from twin.audit.finetune import sweep
-from twin.audit.priors import corpus_place
 
 # A boot is not the place to wait twenty seconds for a node process that may never come.
 PROBE_TIMEOUT_SEC = 2.0

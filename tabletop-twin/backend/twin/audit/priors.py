@@ -15,14 +15,13 @@ to edit a constant.
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from twin.audit.corpus import CORPUS_DIR, DATA_DIR, REPO_ROOT, measures, sentences
+from twin.audit.corpus import CORPUS_DIR, DATA_DIR, corpus_place, measures, sentences
 
 UNCALIBRATED = "uncalibrated"
 
@@ -349,19 +348,6 @@ def derive_services(statutes: list[dict[str, Any]] | None = None) -> dict[str, A
             }
     return {"celex": "", "article": "", "categories": [], "scope": "",
             "derogation": {"quote": "", "points_text": "", "points": {}}, "approval": ""}
-
-
-def corpus_place() -> str:
-    """Where the corpus sits, said without printing this machine's home directory.
-
-    `priors.json` is shipped in a public repository, and `C:\\Users\\<name>\\...` is somebody's
-    folder rather than a provenance fact. The path relative to the repository is the same fact
-    on every machine; a corpus parked outside it is named by the variable that put it there.
-    """
-    try:
-        return CORPUS_DIR.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
-    except ValueError:
-        return "$TWIN_CORPUS_DIR" if os.environ.get("TWIN_CORPUS_DIR") else CORPUS_DIR.name
 
 
 def derive(statutes: list[dict[str, Any]] | None = None) -> dict[str, Any]:

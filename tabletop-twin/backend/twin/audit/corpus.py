@@ -66,6 +66,21 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 CORPUS_DIR = Path(os.environ.get("TWIN_CORPUS_DIR", str(REPO_ROOT / "backend" / ".corpus")))
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
+
+def corpus_place(directory: Path | None = None) -> str:
+    """Where the corpus sits, said without printing this machine's home directory.
+
+    The files this layer ships are provenance records in a public repository, and
+    `C:\\Users\\<name>\\...` is somebody's folder rather than a fact about the harvest. The path
+    relative to the repository is the same fact on every machine; a corpus parked outside it is
+    named by the variable that put it there.
+    """
+    where = Path(directory) if directory else CORPUS_DIR
+    try:
+        return where.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        return "$TWIN_CORPUS_DIR" if os.environ.get("TWIN_CORPUS_DIR") else where.name
+
 # A table like nama_10_gdp answers with a hundred and seventy thousand cells. Keeping every
 # one is neither useful nor honest - the priors read a handful of series - so a large table
 # is thinned by a fixed stride and the manifest says how many cells were there, how many
@@ -205,6 +220,17 @@ def sentences(text: str) -> list[str]:
     """Sentences, for the quote that has to travel with every derived number."""
     flat = re.sub(r"\s+", " ", text)
     return [s.strip() for s in SENTENCE.findall(flat) if len(s.strip()) > 12]
+
+
+# The words a legal text uses for everything, so a search that matches on them has found the
+# corpus rather than a rule. "Services" is in almost every entry of Article 5(1), so a query
+# matched only on it has not been placed.
+STOPWORDS = frozenset("""a an the of and or to for in on with by at from is are other than all any
+such where also its their it this that services service undertakings entity audit audited""".split())
+
+
+def tokens(text: str) -> set[str]:
+    return {word for word in re.findall(r"[a-z]+", text.lower()) if word not in STOPWORDS and len(word) > 2}
 
 
 PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (

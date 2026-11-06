@@ -32,8 +32,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 
-from twin.audit.agents import CLEAR, BREACH, HOLD, SILENT, Case, Firm, Priors, QUESTIONS, STOPWORDS
-from twin.audit.corpus import DATA_DIR
+from twin.audit.agents import CLEAR, BREACH, HOLD, SILENT, Case, Firm, Priors, QUESTIONS
+from twin.audit.corpus import DATA_DIR, STOPWORDS
 from twin.eval.grounding import collect, ungrounded
 from twin.planner.model import number_tokens
 
