@@ -146,6 +146,44 @@ chat transcript, but who asked for what, what stopped it, and what is still open
 A withdrawal asked for after the money has already moved is recorded as the attempt
 it was.
 
+Every read of that trail takes a window: today, the last seven days, or the whole
+history. Those are the three questions anybody actually asks at a table, and a fold that
+does not say which one it answered is a number with no date on it. The same arithmetic
+feeds two places — the summary a director reads, and the short brief the twin is handed
+before it answers anything — so when it says what it already refused this week it is
+quoting a logged row, not remembering one. The miniature carries that brief too, which is
+why the money panel can state the twin's week without being asked.
+
+## The firm beside the table
+
+The twin answers questions about its own cash. A second miniature on the same service
+answers questions about somebody else's: twelve audit roles that rule on European
+company-audit and financial-statement rules, and a card on the table that says what they
+decided. It is the same world, the same accounts, the same ledger and the same rule that a
+figure nobody computed may not be spoken.
+
+Three things keep it honest, and they are the reason it lives here rather than beside it:
+
+- **Its thresholds are read out of the law, not remembered.** Fourteen of the fifteen
+  figures the firm quotes were derived from 299 articles across 8 statutes fetched from
+  open EU sources, each with the article attached. The fifteenth — materiality as a share
+  of turnover — is left uncalibrated because no article states it, and a blank that says so
+  is better than a plausible number.
+- **The agreement is kept somewhere other than in this program's memory.** The roles are
+  registered on a Solidity engagement contract on a local EVM sidecar, and the bytecode is
+  a second authority that sometimes disagrees: an engagement one basis point past the fee
+  cap is refused by the contract even where the rules call the finding binding, and the card
+  prints the refusal name that came back out of the chain rather than a sentence about
+  failure.
+- **A refusal is still evidence.** Agent-to-agent messages go over the same bus, and a
+  refused write is journalled like any other. Agreements stop at *attested* and wait,
+  because nobody in this deployment holds a human key, and the number waiting on a
+  signature is shown as a state the table is in.
+
+[`FIRM.md`](FIRM.md) covers the harvest, the verdicts, the contract and what the card is
+allowed to claim. The whole subsystem runs with no paid credential: with no model key the
+firm answers from the same rule planner as the twin, and says so on the card.
+
 ## Accessibility
 
 Every spoken line is also a caption. Every gesture has a voice and a gaze
@@ -157,7 +195,10 @@ on the panels. A card changes its whole surface when its state changes — band,
 and border together — and the chip carries the word for that state, so a person who
 cannot tell the amber from the red still reads "your hold" or "offline". Nothing on
 a panel is a colour alone, and the decision card names the decision it is asking for
-and what the money would do.
+and what the money would do. The hold that settles money is said twice over as well: five
+marks that fill as the contact lasts, and the seconds it has actually lasted written
+underneath, so a hand that never sees the gauge can still read the rule it is being asked to
+meet.
 
 ## Scope
 
@@ -165,18 +206,38 @@ One fictional persona, a freelance illustrator with lumpy income. One domain, ca
 flow. One horizon, ninety days. No bank linking, no investment advice, no crypto,
 no multiplayer, no avatars of real people.
 
+The firm beside the table is a second domain, added on purpose: European audit and
+financial-statement rules, put to fourteen fictional engagements, answering only with
+figures the harvest produced. It does not audit the twin's cash and the twin does not speak
+for it; each has its own card. No real firm, real company or real statutory auditor is
+modelled by any of the twelve roles, and none of this is advice to anybody with a filing
+deadline.
+
 ## Running it
 
-Two halves: a Python service that owns the simulation, policy and model adapters,
-and an Immersive Web SDK client that owns the table.
+Two halves, and an optional third: a Python service that owns the simulation, policy and
+model adapters, an Immersive Web SDK client that owns the table, and a contract sidecar the
+firm can be pointed at when somebody wants its agreements kept outside either of them.
 
 ```sh
 # service
 python -m uvicorn twin.api.main:app --reload          # from the backend directory
+python -m twin.eval                                   # the same directory, no server, no key
 
 # client
 npm install && npm run dev                            # from the web directory
+
+# engagement contract, optional
+node serve.mjs                                        # from the chain directory
 ```
+
+That second line scores the service on the promises it makes, and it is the one command
+here that answers a question no test asks. A test says a rule fired; the eval says whether
+the run would look any different if the rule were not there. It reports cases passed,
+checks passed, how many guard cases still catch their own seeded failure, and which policy
+rules any case reaches at all. A rule nobody reaches is not a protection, and a case that
+passes with its guard removed proves nothing; both fail the command rather than being
+noted, so it can be run in a check the way the suite is.
 
 The client reads `VITE_TWIN_API` for the service origin. The service reads names of
 credentials, never values checked into this repository. Muse — Meta's Model API —
@@ -198,6 +259,15 @@ origin the immersive client's own dev server uses, because a table that cannot r
 the service draws nothing), and `TWIN_RECONCILE_SEC` — off by default — turns on the
 background sweep of payments that are still waiting for an answer.
 
+The contract is off by default in the same way. `TWIN_CHAIN_URL` names the sidecar the
+firm writes its agreements to, and `TWIN_CHAIN_TOKEN` is what the sidecar expects on
+those calls; with neither set the service never asks for a chain, and the firm's card
+says *no contract* and gives the reason instead of showing an empty list where agreements
+would have been. The sidecar reads `TWIN_CHAIN_PORT` (8791), `TWIN_CHAIN_JOURNAL` and
+`TWIN_PRIORS`, the last of which points it at the same derived thresholds the firm quotes,
+so the fee cap the bytecode enforces is the one the harvest produced rather than a number
+typed into a contract.
+
 The test suite needs a server for the same reason the service does. Point
 `TWIN_DB_URL` at one you already run and every test gets a schema of its own on it, so
 nothing is read from a previous run and nothing is written to `public`. Leave it unset and
@@ -215,23 +285,27 @@ from then on.
 
 ## Verification status
 
-The service is covered by 309 tests that run the forecast, the forks, the policy
+The service is covered by 388 tests that run the forecast, the forks, the policy
 engine, the guardrails in front of it, the payment state machine, the settlement catalog,
-the accounts, the world a device opens for itself, the audit trail, the real PayPal
-transport and the Muse route —
+the accounts, the world a device opens for itself, the audit trail, the twelve roles and
+the contract they write to, the real PayPal transport and the Muse route —
 each of the last two against a gateway that answers on a socket, so a refused credential,
 a rate limit, a reply that never arrives, a stream that invents a figure mid-sentence and
 a gateway that refuses one request shape are all exercised here rather than discovered in
-production. Opening a world is two writes, so two first visits from one device are raced
+production. The firm is run both ways it can be met: with no chain configured, where the
+answer is an empty list plus the reason it is empty, and against a sidecar the test stands
+up itself, where what the suite asserts is the bytecode's own refusal of an engagement past
+the cap. Opening a world is two writes, so two first visits from one device are raced
 against each other on purpose — and the race was run with the guard switched off first,
 to check that there is something to guard. No test ever holds a real credential: the
 environment is emptied around every one of them, and a test that wants an endpoint stands
 it up itself. The whole suite runs against a real PostgreSQL server, one schema per test,
 and the run above was measured against a server started from the packaged binaries on this
-machine: 309 passed in 84.23 seconds. The same suite ran in 41 seconds when it was 287
-tests against the file it replaced, so part of that difference is twenty-two more tests and
-part of it is a socket instead of a memory-mapped file. It is bought back the first time a
-world has to survive onto a different host.
+machine: 388 passed in 212.22 seconds, on a run that shared the machine with the dev
+server, the service and a chain node, against 91.14 seconds for 328 tests with nothing else
+on it. It was 287 tests in 41 seconds against the file it
+replaced, and the gap is part more tests and part a socket instead of a memory-mapped file.
+It is bought back the first time a world has to survive onto a different host.
 
 That last habit is now a file of its own. Six failures with known answers — a payment
 left in a state nobody owns, a rail the catalog says cannot reach a country, a narration
@@ -263,8 +337,8 @@ card, the card that asks for a decision, the panel listing money that has left t
 table, and the plate above the time wheel. Each is now a layout rather than a stack of
 lines — a state band, a byline that keeps route, account and day apart instead of
 squeezing them into one row, one caption at a size meant to be read at arm's length, and
-a two-by-two grid of asks where four buttons used to wrap over each other. Each of the
-five states moves the band, the chip and the card border at once, and the chip carries
+a two-by-two grid of asks where four buttons used to wrap over each other. Each state a
+card can be in moves the band, the chip and the card border at once, and the chip carries
 the word for the state, so amber and blue are never the only difference.
 
 That run put a real decision through them. A payment above the approval floor was
@@ -325,6 +399,74 @@ forgiving. A
 real gateway remembers a captured order across anybody's restart, which is exactly why the
 transport that talks to one is the piece that cannot be pointed at a localhost stand-in by
 way of an environment variable.
+
+What the suite checks and what it would notice are different questions, and the second one
+is now scored on its own. `python -m twin.eval` ran 26 promises as 114 checks, caught 18 of
+18 seeded failures with each guard switched off one at a time, and reached 24 of 24 policy
+rules. It needed no key and no server: every figure it argues about came out of the code
+under test. Two of those checks were added because the case they belonged to was passing on
+vacancy — a rule that refuses a smuggled figure proves nothing until the same sentence with
+a computed figure in it is allowed, and a summary that counts rows proves nothing until the
+run is shown to have produced rows to count.
+
+Eight of those promises belong to the firm, and they are the kind that would otherwise be
+argued about rather than run: a breach or a silence that opens no agreement, a rule nobody
+stated that keeps a role quiet instead of letting it guess, words that have to agree with
+the verdict printed beside them, a weak match that is escalated rather than rounded up, and
+a model that cannot move a threshold. Five of them carry a negative control that still
+catches its own seeded failure. The other three are measurements rather than guards: every
+figure traces to a fact in the harvest, every threshold the code actually enforces is
+exercised by some case, and the training corpus describes this firm rather than a generic
+one.
+
+Memory was tested for the first time as its own subject, and the test found something. The
+windowed folds reversed the trail on one branch and not on the other, so the same week read
+from a session and read from the database came back in opposite orders. No count was wrong,
+and order was never meant to mean anything — which is exactly why nobody noticed until a
+test asked. Order is now not part of the contract, stated rather than implied. The edges
+are checked the same way: the seventh day is inside a week and the eighth is outside it, a
+row this code cannot place in time stays visible instead of quietly dropping out of a
+summary, and the brief the twin is handed before it answers says the same figures the
+summary endpoint computes from the same rows.
+
+The panels were driven in a browser again for the states they did not have. Seven exist
+now: listening, thinking, speaking, your hold, pinch sent, asking the rail, offline. A bill
+above the approval floor put through HTTP surfaced the decision card with a hold gauge —
+five marks, one per fifth of the approval second, filled from the same measurement the coin
+keeps rather than from a frame counter — and the money panel gained the twin's own week
+under its list of open payments, which is the backend's fold and not a client-side count.
+The score in a caption byline, "keeps 76% of 12", is read off the orb's own component, which
+the world fills from the payload; no panel works that number out a second time. Taking the
+service away — every request aborted, nothing else touched — moved all three cards to the
+offline treatment at once; the orb's float and the water's ripple are gated on the same
+published state, and that part is a claim about code this run reached, not a motion a still
+frame can show.
+
+That run also found the first real defect of the pass. The separator the panels join their
+lines with was a middle dot, and the bundled font atlas does not contain it, so every joined
+figure on the money and decision cards drew a small box where a number should be. The
+separator and the two spoken sentences that leaned on an em dash are plain ASCII now, which
+is the rule this project already states and had not followed everywhere; the run above is
+the one that shows the boxes gone, not the one that found them.
+
+The firm's card was driven the same way, and this time the managed runtime answered for it:
+the scene rendered valid with the new panel in its visible set, and the live element text
+and component values were read out of the running app rather than out of a preview. With the
+service up and no chain anywhere near it, the card read *no contract*, "12 roles named, none
+hired - no contract was reached", and gave the reason the service gave, naming the variable
+that was not set. A controller was aimed at the card's button and its trigger pressed, and
+the card then carried what the twelve roles actually returned for the first engagement:
+"clear 9 - hold 2 - breach 0 - silent 1", the binding finding with the article it cites, and
+"the words above came from the rules route", which is true because no key was ever supplied.
+
+The sidecar was started and the service restarted with `TWIN_CHAIN_URL` pointing at it. No
+code changed and no page was rebuilt, and the same card moved to *on contract* with "12 of 12
+roles hired". Pressing the button again opened four agreements on the contract with four
+waiting on a signature, and once more advanced the engagement to 2 of 14 while the waiting
+count rose to eight — cumulative counts off the chain, not a client keeping its own tally.
+Every string the card prints was then scanned across all fourteen engagements: the only
+non-ASCII character in any response is inside the quoted article text, which the card does
+not display, so nothing reaches the atlas gap the money panel's separator fell into.
 
 What a browser still cannot do is the headset. The token is picked up by a near grab and
 held there by a squeeze, the wheel turns under a hand, and none of that has been watched

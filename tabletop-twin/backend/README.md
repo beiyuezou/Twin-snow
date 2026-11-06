@@ -160,6 +160,30 @@ finished it — and a human can read it back through an audit endpoint or as a
 summary in sentences. A withdrawal asked for after the money has already moved is
 recorded as the attempt it was, refused or not.
 
+## The firm beside the table
+
+A second domain shares this service: twelve audit roles that rule on European
+company-audit and financial-statement rules. They share the accounts, the world a device
+opens for itself, the ledger, the guardrails and the eval command, and they keep the one
+rule the rest of the service keeps — a figure either came out of an arithmetic somebody
+can re-run, or it is not said.
+
+Fifteen thresholds are quoted. Fourteen were derived from a harvest of 299 articles across
+8 statutes, fetched from open EU sources and recorded in a manifest that says what each
+document was and which article a figure was taken from. The fifteenth — materiality as a
+share of turnover — is left uncalibrated, because no article in that corpus states it and a
+plausible invented percentage is the one thing this layer cannot be argued with.
+
+A review puts one engagement to all twelve roles at once. Each returns a verdict, a
+sentence and the citation it is standing on, and the verdicts are four and not a mood
+scale: **clear**, **hold**, **breach**, and **silent** — which is a role saying it has no
+authority over this fact rather than guessing at one. A finding binds only when it names
+the role that has to act. Everything the endpoints return is a count of rows or a fold of
+them; the client is not given figures to interpret.
+
+[`../FIRM.md`](../FIRM.md) covers the harvest, the contract and what the card is allowed to
+claim.
+
 ## The persona
 
 One fictional freelance illustrator, four weeks of seeded history, ninety days
@@ -187,7 +211,10 @@ default database — a service started without that variable refuses to serve wo
 than opening a local file nobody asked for, because a world that only exists on one
 machine cannot be the same table on the next. A URL that points at a `.db` file is
 refused by name for the same reason. `TWIN_ALLOW_ORIGINS` lists the client origins allowed
-to call it.
+to call it. The contract is opt-in: `TWIN_CHAIN_URL` names the sidecar the firm writes its agreements
+to, and with it unset the service never asks for a chain, so the firm reports that as a
+state of the deployment rather than as a failure — `TWIN_CHAIN_TOKEN` is what the sidecar
+expects on those calls.
 
 Model and settlement credentials are read from the environment by name, and no value
 is kept in this repository. Muse needs only a key, since its address and default model
@@ -196,11 +223,12 @@ name all three itself.
 
 `python -m pytest` spends nothing and reveals nothing. The credential variables are
 emptied around every test, so a suite run on a machine that happens to hold a real key
-never sends a request with it. The endpoints the tests do exercise — Muse and PayPal —
-are gateways the tests stand up on localhost, and they answer on a socket rather than
-as stubs precisely so the awkward failures can be provoked here instead of discovered
-in production: a refused credential that must not be asked twice, a rate limit that
-names a wait, and a reply that never arrives after the work was done.
+never sends a request with it. The endpoints the tests do exercise — Muse, PayPal and the
+engagement contract — are services the tests stand up on localhost, and they answer on a
+socket rather than as stubs precisely so the awkward failures can be provoked here instead
+of discovered in production: a refused credential that must not be asked twice, a rate
+limit that names a wait, a reply that never arrives after the work was done, and a
+proposal the contract's own bytecode declines to record.
 
 The database is treated the same way. If `TWIN_DB_URL` is already set, the suite tests
 against that server and touches nothing on it but the schemas it creates and drops; each

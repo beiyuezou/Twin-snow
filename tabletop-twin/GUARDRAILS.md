@@ -117,3 +117,37 @@ payment stuck in unknown, an unreachable rail, an invented figure mid-stream, a 
 offered in place of a hold, a ledger that has not landed, a database socket that the
 server closed. A test written by whatever fixed the bug tends to ask a soft question, so
 every one of these has to be able to produce the failure first.
+
+The discipline now has a score. `python -m twin.eval` runs each guarded promise twice —
+once whole, once with only its own rule taken out — and reports how many of them still
+catch the failure they seeded, beside which policy rules any case reaches at all. A guard
+that has lost its control and a rule nobody ever exercises both fail the command, so
+"covered" is a number the run produces rather than a word somebody chose.
+
+## The firm's rules are the same shape
+
+The audit roles beside the table get the same treatment, and the same five sentences
+carry it. A breach or a silence opens no agreement. A rule nobody stated keeps a role
+quiet instead of letting it infer one. The words a role says have to agree with the
+verdict printed beside them. A weak match is escalated rather than rounded up. And a
+model may not move a threshold: the figures come from the harvest, with the article
+attached, and a sentence cannot edit the number it is quoting.
+
+Each of those five is run twice in `python -m twin.eval`, once whole and once with only
+its own rule removed, and each still produces the failure it was seeded with. They are
+counted in the same 18 controls as the six above, not kept in a separate tally that
+flatters the total.
+
+## A second authority, which can say no twice
+
+The firm's agreements are written to a contract, and the contract is not this service.
+Its bytecode checks the fee cap on every proposal, so an engagement one basis point past
+the cap is refused with `FeeCapBreached` and nothing is recorded — including where the
+rules call a finding binding. That is the case worth reading carefully, because it is the
+one place in this project where two correct authorities disagree, and the answer is not to
+pick a winner. The card shows both counts: what the roles bound, and what the chain would
+not take.
+
+What this layer still refuses to do is treat a refusal as a failure to retry. A rejected
+offer is journalled like an accepted one, because a trail that only keeps successes is not
+evidence, it is a story.
