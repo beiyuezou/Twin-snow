@@ -227,17 +227,27 @@
         "made_on_day": -27,
         "resolves_on_day": -13,
         "outcome": "hit",
-        "tool": "forecast"
+        "tool": "forecast",
+        "check": {
+          "kind": "event_arrived_by_day",
+          "event_id": "inv-kepler",
+          "day": 26
+        }
       },
       {
         "id": "p-102",
         "subject": "sub-scan",
-        "statement": "The scanning subscription is worth keeping this quarter.",
+        "statement": "The scanning subscription bills on the day it is due.",
         "probability": 0.6,
         "made_on_day": -26,
         "resolves_on_day": -12,
         "outcome": "missed",
-        "tool": "fork"
+        "tool": "fork",
+        "check": {
+          "kind": "event_arrived_by_day",
+          "event_id": "sub-scan",
+          "day": 9
+        }
       },
       {
         "id": "p-103",
@@ -247,7 +257,12 @@
         "made_on_day": -24,
         "resolves_on_day": -22,
         "outcome": "hit",
-        "tool": "forecast"
+        "tool": "forecast",
+        "check": {
+          "kind": "event_arrived_by_day",
+          "event_id": "bill-rent",
+          "day": 1
+        }
       },
       {
         "id": "p-104",
@@ -257,27 +272,42 @@
         "made_on_day": -21,
         "resolves_on_day": -8,
         "outcome": "hit",
-        "tool": "forecast"
+        "tool": "forecast",
+        "check": {
+          "kind": "event_arrived_by_day",
+          "event_id": "inv-royalties",
+          "day": 24
+        }
       },
       {
         "id": "p-105",
         "subject": "inv-northwind",
-        "statement": "Northwind pays on time if chased once.",
+        "statement": "Northwind clears within two weeks of its due date.",
         "probability": 0.8,
         "made_on_day": -20,
         "resolves_on_day": -6,
         "outcome": "missed",
-        "tool": "fork"
+        "tool": "fork",
+        "check": {
+          "kind": "event_arrived_by_day",
+          "event_id": "inv-northwind",
+          "day": 52
+        }
       },
       {
         "id": "p-106",
         "subject": "bill-materials",
-        "statement": "Paper spend stays under budget.",
+        "statement": "Paper and plates is paid by the day it is due.",
         "probability": 0.65,
         "made_on_day": -17,
         "resolves_on_day": -11,
         "outcome": "hit",
-        "tool": "forecast"
+        "tool": "forecast",
+        "check": {
+          "kind": "event_arrived_by_day",
+          "event_id": "bill-materials",
+          "day": 17
+        }
       },
       {
         "id": "p-107",
@@ -287,7 +317,11 @@
         "made_on_day": -15,
         "resolves_on_day": -9,
         "outcome": "hit",
-        "tool": "forecast"
+        "tool": "forecast",
+        "check": {
+          "kind": "balance_ge_zero_at_day",
+          "day": 5
+        }
       },
       {
         "id": "p-108",
@@ -297,27 +331,40 @@
         "made_on_day": -12,
         "resolves_on_day": -2,
         "outcome": "missed",
-        "tool": "forecast"
+        "tool": "forecast",
+        "check": {
+          "kind": "event_arrived_by_day",
+          "event_id": "inv-portrait",
+          "day": 34
+        }
       },
       {
         "id": "p-109",
         "subject": "bill-plan",
-        "statement": "The tablet instalment is small enough to ignore.",
+        "statement": "The tablet instalment leaves the bank above zero.",
         "probability": 0.85,
         "made_on_day": -10,
         "resolves_on_day": -5,
         "outcome": "hit",
-        "tool": "forecast"
+        "tool": "forecast",
+        "check": {
+          "kind": "balance_ge_zero_at_day",
+          "day": 3
+        }
       },
       {
         "id": "p-110",
         "subject": "sub-plates",
-        "statement": "Cancelling the print box buys a safer week.",
+        "statement": "Pulling the print box leaves the bank above zero.",
         "probability": 0.55,
         "made_on_day": -8,
         "resolves_on_day": -1,
         "outcome": "hit",
-        "tool": "fork"
+        "tool": "fork",
+        "check": {
+          "kind": "balance_ge_zero_at_day",
+          "day": 15
+        }
       },
       {
         "id": "p-111",
@@ -327,7 +374,11 @@
         "made_on_day": -5,
         "resolves_on_day": -1,
         "outcome": "hit",
-        "tool": "forecast"
+        "tool": "forecast",
+        "check": {
+          "kind": "balance_ge_zero_at_day",
+          "day": 47
+        }
       },
       {
         "id": "p-112",
@@ -337,7 +388,12 @@
         "made_on_day": -3,
         "resolves_on_day": -1,
         "outcome": "missed",
-        "tool": "fork"
+        "tool": "fork",
+        "check": {
+          "kind": "event_arrived_by_day",
+          "event_id": "inv-kepler",
+          "day": 19
+        }
       }
     ]
   }

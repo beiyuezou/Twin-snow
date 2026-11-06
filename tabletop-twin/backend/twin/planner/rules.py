@@ -116,8 +116,8 @@ class RulePlanner:
                     )
                 if f["dry_run_percent"]:
                     return (
-                        f"The middle path never goes under — its lowest is {f['median_low_dollars']} dollars "
-                        f"around day {f['pinch_day']} — but {f['dry_run_percent']} of {f['runs']} runs do."
+                        f"The middle path never goes under: its lowest is {f['median_low_dollars']} dollars "
+                        f"around day {f['pinch_day']}, but {f['dry_run_percent']} of {f['runs']} runs do."
                     )
                 return (
                     f"Lowest point is {f['median_low_dollars']} dollars around day {f['pinch_day']}. "

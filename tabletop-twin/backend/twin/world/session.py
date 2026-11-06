@@ -34,10 +34,15 @@ from twin.planner.tools import ToolCall, handler_map, parse_calls
 from twin.policy.engine import Action, Policy, SpendWindow, Verdict, evaluate
 from twin.safety.guardrails import Proposal, figures, parse_cents, review
 from twin.store import Store
+from twin.world.memory import digest
 
 DEFAULT_HORIZON = 90
 DEFAULT_RUNS = 2000
 SEED = 20261028
+# How far the twin's own memory reaches back, and how much of it is kept in the room.
+# Read at the same moment the payments are adopted, so a restart does not hand a person
+# a table whose twin remembers nothing about the morning.
+MEMORY_ROWS = 200
 # Only these verbs actually take money out the door, so only these may enter the
 # payment machine. A chase or a cancellation is a change to the ledger, not a charge.
 CHARGE_VERBS = frozenset({"pay_bill", "start_subscription", "shift_payment"})
@@ -135,6 +140,9 @@ class Session:
         if isinstance(planner, ModelPlanner):
             planner.voice_prompt = persona.voice_prompt
         session = cls(ledger=ledger, policy=policy, persona=persona, planner=planner, store=store, user_id=user_id)
+        # Read the trail before anything this method writes to it, or the first line of
+        # the new visit would be the last line of the old one.
+        session.log = store.read_log(user_id, limit=MEMORY_ROWS)
         session.machine = PaymentMachine(approval_floor_cents=policy.approval_floor_cents)
         session.day = int(row["day"])
         session.horizon_days = int(row["horizon_days"])
@@ -264,6 +272,8 @@ class Session:
         """One line in the trail. Everything the twin decided is written, not just said."""
         entry = {"day": self.day, "kind": kind, **payload}
         self.log.append(entry)
+        if len(self.log) > MEMORY_ROWS:
+            del self.log[: -MEMORY_ROWS]
         if self.store is not None and self.user_id:
             self.store.append_log(self.user_id, self.day, kind, payload)
 
@@ -291,6 +301,14 @@ class Session:
             ],
             "voice_prompt": self.persona.voice_prompt,
             "branches": sorted(self.branches),
+            # What this table already did. A planner without this can describe the
+            # ledger but cannot answer "did you already try that?", so it either says
+            # nothing or guesses — and a guess from a model is not a memory.
+            "memory": digest(
+                self.log,
+                day=self.day,
+                open_payments=sum(1 for record in self.machine.all() if record.state not in TERMINAL),
+            ),
         }
 
     @staticmethod
@@ -511,6 +529,11 @@ class Session:
         elif verdict == "allow":
             # Below the floor the policy itself is the approval; there is no gesture to wait for.
             self.machine.approve(record, "auto")
+            # ...but the money still moved, and the trail that says who approved it is the
+            # one the memory endpoint counts. A settlement written only as an "allow" verdict
+            # is invisible to a sentence about what left the table.
+            self.record("approval", {"action_id": action.id, "gesture": "auto",
+                                     "recipient": who, "amount_cents": amount})
             payload["state"] = self._settle(record).value
         return payload
 
@@ -548,7 +571,7 @@ class Session:
         record = self.machine.get(key)
         refusal = None
         if record.state in {PaymentState.SUBMITTED, PaymentState.UNKNOWN, PaymentState.RECONCILING}:
-            refusal = f"{record.state.value} — the money has already left, so this needs a recall, not a rejection"
+            refusal = f"{record.state.value}: the money has already left, so this needs a recall, not a rejection"
         elif record.state in TERMINAL:
             refusal = f"{record.state.value} is already settled"
         # Logged whether or not it lands, so an auditor sees the ask that could not be withdrawn.
@@ -819,4 +842,5 @@ def _prediction(raw: dict) -> Prediction:
         resolves_on_day=int(raw["resolves_on_day"]),
         outcome=Outcome(raw.get("outcome", "open")),
         tool=raw.get("tool", "forecast"),
+        check=dict(raw.get("check") or {}),
     )

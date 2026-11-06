@@ -11,6 +11,7 @@ from twin.domain.forecast import Forecast
 from twin.domain.interventions import compare
 from twin.payments.machine import TERMINAL
 from twin.world.heartbeat import late_probability
+from twin.world.memory import digest
 from twin.world.session import Session, dollars
 
 PALETTE = {
@@ -29,6 +30,7 @@ PALETTE = {
 
 def scene_payload(session: Session) -> dict:
     baseline = session.baseline
+    unresolved = payments(session)
     return {
         "meta": {
             "persona": session.persona.name,
@@ -48,7 +50,10 @@ def scene_payload(session: Session) -> dict:
         "lake": lake(session),
         "garden": garden(session),
         "branches": branches(session),
-        "payments": payments(session),
+        "payments": unresolved,
+        # The twin's own week, folded from the same rows the summary endpoint reads. It is
+        # on the table so "what have you already done" is answerable without a question.
+        "memory": digest(session.log, day=session.day, open_payments=len(unresolved)),
         "focus": session.focus,
         "twin": {"look_at": session.focus, "speak": session.last_speech},
     }
