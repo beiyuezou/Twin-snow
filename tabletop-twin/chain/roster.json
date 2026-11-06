@@ -1,0 +1,17 @@
+{
+  "owner": "firm-owner",
+  "agents": [
+    { "role": "engagement-partner", "title": "Engagement partner", "principal": "human-engagement-partner" },
+    { "role": "quality-review-partner", "title": "Quality management reviewer", "principal": "human-quality-reviewer" },
+    { "role": "independence-monitor", "title": "Independence monitor", "principal": "human-independence" },
+    { "role": "non-audit-assessor", "title": "Non-audit services assessor", "principal": "human-non-audit" },
+    { "role": "rotation-tracker", "title": "Partner rotation tracker", "principal": "human-rotation" },
+    { "role": "materiality-reviewer", "title": "Materiality reviewer", "principal": "human-materiality" },
+    { "role": "fraud-risk-assessor", "title": "Fraud risk assessor", "principal": "human-fraud-risk" },
+    { "role": "group-audit-coordinator", "title": "Group audit coordinator", "principal": "human-group-audit" },
+    { "role": "audit-committee-liaison", "title": "Audit committee liaison", "principal": "human-audit-committee" },
+    { "role": "aml-compliance-officer", "title": "AML compliance officer", "principal": "human-aml" },
+    { "role": "evidence-archivist", "title": "Working papers archivist", "principal": "human-archivist" },
+    { "role": "tender-administrator", "title": "Tender administrator", "principal": "human-tender" }
+  ]
+}
