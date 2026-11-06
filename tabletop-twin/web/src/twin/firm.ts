@@ -38,6 +38,25 @@ interface Paint {
   display?: 'none' | 'flex' | 'contents';
 }
 
+/**
+ * Who wrote one judgement, in the few words a caption has. The backend's route is a whole
+ * sentence about what happened ("rules (muse refused: ...)") because that is what a log
+ * wants; a card wants the shorter thing - the model read the law, or the firm's own rule
+ * stood in for it.
+ */
+function spoke(route: string): string {
+  if (route.startsWith('rules (muse refused')) return 'rules, muse refused';
+  if (route.startsWith('rules (muse did not answer')) return 'rules, muse did not answer';
+  if (route.startsWith('rules (the harvested text')) return 'rules, no law text on this machine';
+  if (route === 'rules') return 'rules';
+  return route.includes(':') ? route.slice(0, route.indexOf(':')) : 'the model';
+}
+
+/** Whether the firm's own rule answered this judgement rather than an endpoint. */
+function stoodIn(route: string): boolean {
+  return route.startsWith('rules');
+}
+
 /** One way to write a field, so a missing element is a no-op rather than a thrown frame. */
 function put(panel: UIKitMLAsset | undefined, id: string, props: Paint): void {
   panel?.getElementById<UIKit.Text>(id)?.setProperties(props);
@@ -120,7 +139,7 @@ export class TwinFirmSystem extends createSystem({
     put(this.panel, 'FirmHeadline', { text: this.headline(review) });
     put(this.panel, 'FirmAgreements', { text: this.agreements(attested, refused, review), display: review ? 'flex' : 'none' });
     put(this.panel, 'FirmReason', { text: reason, display: reason ? 'flex' : 'none' });
-    put(this.panel, 'FirmNote', { text: review ? `the words above came from the ${review.route.route} route` : '' });
+    put(this.panel, 'FirmNote', { text: this.who(review) });
     put(this.panel, 'Btn-firm', { text: twin.firmBusy ? 'Asking the firm...' : 'Put the next engagement to the firm' });
   }
 
@@ -168,6 +187,10 @@ export class TwinFirmSystem extends createSystem({
    * One sentence, chosen by what it would cost to leave it out: a finding that binds
    * somebody is the one a person has to sign, so it leads. A breach leads when nothing
    * binds, and a silent answer leads when there is neither.
+   *
+   * The byline names who wrote it, because nobody reading a sentence can tell a model's
+   * finding from one the firm always knew, and the person in front of the card is being
+   * asked to trust one of the two.
    */
   private headline(review: FirmReview | null): string {
     if (!review) return 'Nothing has been put to the firm.';
@@ -175,7 +198,24 @@ export class TwinFirmSystem extends createSystem({
       ?? review.findings.find((finding) => finding.verdict === 'breach')
       ?? review.findings.find((finding) => finding.verdict === 'silent')
       ?? review.findings[0];
-    return `${first.role}: ${first.sentence}`;
+    return `${first.role} (${spoke(first.route)}): ${first.sentence}`;
+  }
+
+  /**
+   * How the twelve answers divide between the model and the rules, counted from each
+   * finding's own route rather than from one route for the engagement - one ask can be
+   * refused and the next accepted, and a card that said "muse" over both would be
+   * reporting the last request rather than the twelve answers.
+   */
+  private who(review: FirmReview | null): string {
+    if (!review) return '';
+    const decided = review.findings.filter((finding) => !stoodIn(finding.route)).length;
+    if (!decided) return 'the words above came from the rules route';
+    const fellBack = review.findings.filter((finding) => finding.route.startsWith('rules (')).length;
+    return joined([
+      `${decided} of ${review.findings.length} judgements the model read out of the law text`,
+      fellBack ? `${fellBack} fell back to the rules` : '',
+    ]);
   }
 
   private agreements(attested: OpenedAgreement[], refused: OpenedAgreement[], review: FirmReview | null): string {
