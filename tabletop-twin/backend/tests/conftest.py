@@ -35,6 +35,9 @@ CREDENTIAL_VARS = (
     "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL",
     "OPENAI_COMPAT_BASE_URL", "OPENAI_COMPAT_API_KEY", "OPENAI_COMPAT_MODEL",
     "PAYPAL_CLIENT_ID", "PAYPAL_SECRET", "PAYPAL_ENVIRONMENT",
+    # A bare `Chain()` that remembered a developer's running sidecar would spend real gas on
+    # somebody's real agreement history and call the result a test.
+    "TWIN_CHAIN_URL", "TWIN_CHAIN_TOKEN",
 )
 
 TEST_PORT = 55432
