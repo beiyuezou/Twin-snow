@@ -7,11 +7,17 @@ judgement, not a figure in a regulation - the agent says so and stops, because a
 invents a threshold is worse than one that admits it has none. Three of the twelve roles end up
 telling a human that the decision is theirs, which is the correct output, not a failure.
 
-A model writes the sentences and decides nothing. `ModelWords` hands `ModelPlanner` the figures
-a finding was computed from and asks for one sentence about them; every number in the reply has
-to be one of those figures, and a reply that invents one is dropped for the rule's own wording.
+A model decides nothing here, and that is the point of this file: every verdict below is arithmetic
+on a figure the corpus was calibrated against, so the twelve answers stand with no endpoint, no key
+and no network. `ModelWords` is the only place Muse reaches in, and it reaches in at the wording -
+handed the figures a finding was computed from and asked for one sentence about them, with every
+number in the reply checked against that list and an invented one dropped for the rule's own words.
 The verdict, the threshold and the arithmetic come from the derived priors, because a route that
 cannot be trusted with arithmetic cannot be trusted with a statutory limit either.
+
+`audit.judge` is where that changes when a machine is configured for it: there the model reads the
+harvested articles themselves and makes the call, and the functions below become the answer used when
+a judgement cannot be verified. Both routes are honest about which one spoke, in `Finding.route`.
 
 What the firm does with a verdict is decided by the verdict, not by enthusiasm:
 
@@ -26,22 +32,16 @@ What the firm does with a verdict is decided by the verdict, not by enthusiasm:
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 from twin.audit.a2a import Bus
-from twin.audit.corpus import DATA_DIR
+from twin.audit.corpus import DATA_DIR, tokens
 
 PRIORS_FILE = DATA_DIR / "priors.json"
 
 CLEAR, BREACH, HOLD, SILENT = "clear", "breach", "hold", "silent"
-
-# The words a service request can share with the statute and still say nothing. "Services" is in
-# almost every entry of Article 5(1), so a request matched only on it has not been placed.
-STOPWORDS = frozenset("""a an the of and or to for in on with by at from is are other than all any
-such where also its their it this that services service undertakings entity audit audited""".split())
 
 
 @dataclass(frozen=True)
@@ -159,10 +159,6 @@ class Priors:
 
     def uncalibrated(self) -> list[str]:
         return list(self.doc.get("uncalibrated") or [])
-
-
-def tokens(text: str) -> set[str]:
-    return {word for word in re.findall(r"[a-z]+", text.lower()) if word not in STOPWORDS and len(word) > 2}
 
 
 def match_service(request: str, priors: Priors) -> tuple[dict[str, Any], int]:
@@ -577,6 +573,10 @@ class ModelWords:
     back has to be one of them. A reply that invents one is dropped and the rule's own sentence is
     used instead - and the route says that happened, because a fallback nobody can see is a bug
     report nobody reads.
+
+    This is the *captioning* layer, and it is only reached when no `Judge` is wired: with a judge
+    present the model has already written the sentence, verified it against the statute it was shown,
+    and asking a second endpoint to restate it would spend a request to lose the quote.
     """
 
     name = "model"
@@ -605,27 +605,54 @@ class ModelWords:
 class Firm:
     """Asks the twelve questions of a case, then turns the answers into traffic on the chain."""
 
-    def __init__(self, priors: Priors | None = None, words: Any = None) -> None:
+    def __init__(self, priors: Priors | None = None, words: Any = None, judge: Any = None) -> None:
         self.priors = priors or Priors.load()
         self.words = words or RuleWords()
+        self.judge = judge
 
     @classmethod
     def from_env(cls, priors: Priors | None = None) -> "Firm":
-        """Muse if this machine is configured for it, the firm's own rules if it is not."""
-        from twin.planner.model import ModelPlanner
+        """Muse decides if this machine is configured for it; otherwise the firm's own rules do.
 
-        planner = ModelPlanner.from_env()
-        return cls(priors, ModelWords(planner) if planner else RuleWords())
+        `Judge.from_env` is the whole decision: it returns None when no endpoint has a key, and
+        `Judge.ask` returns None when the harvested text is not on the machine either - which is the
+        case that matters, because a judgement nothing can be checked against is not one this firm is
+        entitled to file. Both leave `judge` None and the deterministic answers speaking for
+        themselves, on a route that says so.
+        """
+        from twin.audit.judge import Judge
+
+        return cls(priors, judge=Judge.from_env())
 
     def review(self, case: Case) -> list[Finding]:
-        """Every role, once, in roster order. No network and no chain touched."""
+        """Every role, once, in roster order. No chain touched."""
         found = []
         for role, answer in QUESTIONS:
-            finding = answer(case, self.priors)
-            if finding.role != role:
-                raise AssertionError(f"{role} answered as {finding.role}")
-            found.append(self.words.phrase(finding, case))
+            base = answer(case, self.priors)
+            if base.role != role:
+                raise AssertionError(f"{role} answered as {base.role}")
+            found.append(self._record(base, case))
         return found
+
+    def _record(self, base: Finding, case: Case) -> Finding:
+        """The finding that goes in the engagement file.
+
+        With a judge, the rule below is the fallback and the model's checked judgement is the answer;
+        without one, the rule is the answer and a model may only re-word it. Both branches keep the
+        deterministic `base` in hand, because the thing being substituted for must survive to be
+        substituted in.
+        """
+        if self.judge is not None:
+            from twin.audit.judge import facts_of
+
+            return self.judge.judge(base.role, base.asks, facts_of(case), lambda: base)
+        return self.words.phrase(base, case)
+
+    def describe(self) -> dict[str, Any]:
+        """Whose judgements the firm is speaking with, and what it can check them against."""
+        if self.judge is not None:
+            return self.judge.describe()
+        return self.words.describe()
 
     def transact(self, case: Case, bus: Bus) -> dict[str, Any]:
         """One case through the firm and onto the chain.

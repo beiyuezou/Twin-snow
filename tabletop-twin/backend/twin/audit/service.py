@@ -167,7 +167,7 @@ class FirmService:
             findings = firm.review(case)
             return {
                 "client": case.client,
-                "route": firm.words.describe(),
+                "route": firm.describe(),
                 "findings": [finding.as_dict() for finding in findings],
                 "counts": {verdict: sum(1 for f in findings if f.verdict == verdict)
                            for verdict in ("clear", "hold", "breach", "silent")},
@@ -213,7 +213,7 @@ def brief(priors: Priors | None = None) -> dict[str, Any]:
             "derived_from": doc.get("derived_from") or {},
             "corpus_dir": corpus_place(),
         },
-        "model_route": Firm.from_env().words.describe(),
+        "model_route": Firm.from_env().describe(),
         "chain": service().status(),
     }
 
