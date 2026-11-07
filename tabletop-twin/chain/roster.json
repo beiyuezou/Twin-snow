@@ -12,6 +12,12 @@
     { "role": "audit-committee-liaison", "title": "Audit committee liaison", "principal": "human-audit-committee" },
     { "role": "aml-compliance-officer", "title": "AML compliance officer", "principal": "human-aml" },
     { "role": "evidence-archivist", "title": "Working papers archivist", "principal": "human-archivist" },
-    { "role": "tender-administrator", "title": "Tender administrator", "principal": "human-tender" }
+    { "role": "tender-administrator", "title": "Tender administrator", "principal": "human-tender" },
+    { "role": "contingent-fee-reviewer", "title": "Audit fee terms reviewer", "principal": "human-fee-terms" },
+    { "role": "multi-year-fee-reviewer", "title": "Multi-year fee assessor", "principal": "human-multi-year-fees" },
+    { "role": "transparency-report-reviewer", "title": "Transparency reporting reviewer", "principal": "human-transparency" },
+    { "role": "committee-report-reviewer", "title": "Audit committee reporting reviewer", "principal": "human-committee-report" },
+    { "role": "register-entry-reviewer", "title": "Public register custodian", "principal": "human-register" },
+    { "role": "sustainability-assurance-reviewer", "title": "Sustainability assurance independence reviewer", "principal": "human-sustainability-assurance" }
   ]
 }

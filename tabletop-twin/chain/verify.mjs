@@ -67,7 +67,7 @@ await refusal(chain, 'an agent key cannot register itself', () =>
 for (const agent of roster.agents) {
   await chain.register(agent);
 }
-check('twelve roles registered', (await chain.registeredCount()) === 12, `registry holds ${await chain.registeredCount()}`);
+check(`${roster.agents.length} roles registered`, (await chain.registeredCount()) === roster.agents.length, `registry holds ${await chain.registeredCount()} of ${roster.agents.length}`);
 check('a role the roster never named is unknown', (await chain.known('review-partner')) === false, 'known() is false');
 
 await refusal(chain, 'duplicate registration is refused', () => chain.register(roster.agents[0]), 'AlreadyRegistered');

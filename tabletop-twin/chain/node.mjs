@@ -6,7 +6,7 @@
 // talked around by the agent that finds it inconvenient, which is the only sense in which a
 // firm run by agents can be read by somebody who is not one.
 //
-// Keys are derived from names, so they are not secrets: the twelve agents, their human
+// Keys are derived from names, so they are not secrets: the firm's agents, their human
 // principals and the firm key all rebuild from the journal after a crash. That is the trade
 // being made on purpose. The chain is a durable, checkable record of who agreed to what, not
 // a custody system. The keys that do carry weight are the humans', and `countersign()` only

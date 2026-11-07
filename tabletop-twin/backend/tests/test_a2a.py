@@ -18,6 +18,7 @@ import tempfile
 import pytest
 
 from twin.audit.a2a import STATES, Bus
+from twin.audit.agents import ROLES
 from twin.audit.chain import Chain, ChainDown, ChainError, spawn_sidecar
 from twin.store import Store
 
@@ -33,7 +34,8 @@ def chain():
     box = tempfile.mkdtemp(prefix="twin-a2a-")
     with spawn_sidecar(journal=os.path.join(box, "a2a.journal.jsonl"), wait_sec=120.0) as running:
         assert running.status()["cap_basis_points"] == 7000, "the deployed cap must be the derived one"
-        assert len(running.register_roles()) == 12, "the firm cannot speak for an agent it never hired"
+        assert len(running.register_roles()) == len(ROLES), \
+            "the firm cannot speak for an agent it never hired"
         yield running
 
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.38;
 
-/// Who the twelve agents are, and which person answers for each of them.
+/// Who the firm's agents are, and which person answers for each of them.
 ///
 /// An agent cannot be a party to an agreement until it is registered, and a role cannot be
 /// countersigned for until a principal is set. Both are one-way operations from the firm's
