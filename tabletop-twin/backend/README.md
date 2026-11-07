@@ -181,6 +181,19 @@ authority over this fact rather than guessing at one. A finding binds only when 
 the role that has to act. Everything the endpoints return is a count of rows or a fold of
 them; the client is not given figures to interpret.
 
+The verdict is the model's, when a model is configured, and the service will not file an
+answer it cannot check. The harvested articles are indexed for exactly that: every one has
+an id, is searchable by a role's question, and is stored with the digest of its own text, so
+a citation can be resolved and a quote matched against bytes. A judgement is refused unless
+its verdict is a recognised word, its quote is inside the passage that was actually sent,
+every figure it speaks belongs to the client's file or to that quote, the facts it leaned on
+are facts it was handed, and the colleague it asks to act exists and is not itself. No
+derived threshold appears in the ask at all, because an answer that could copy the number
+out of its own prompt proves nothing. A refused judgement leaves none of its own words
+behind: the rule's verdict, sentence and article stand, and the route names the check that
+refused, or says the endpoint never answered, or says the law text is not on this machine —
+in which case no request is spent, because every answer would have been thrown away.
+
 [`../FIRM.md`](../FIRM.md) covers the harvest, the contract and what the card is allowed to
 claim.
 
@@ -258,3 +271,18 @@ carry on passing.
 a time: the invented bill really does settle, the zero-value charge really does land in
 the ledger, the hold card really does ask for the wrong company. Removing the whole guard
 would prove only that a guard does something; removing one rule proves which one did it.
+
+`tests/test_judge.py` holds the firm's checks to it. It files a judgement a machine cannot
+fault, then breaks one thing at a time — the quote, the passage it claims to come from, the
+figure in the sentence, the colleague being asked to act, the facts leaned on, the width of
+the law that was sent — and every break has to produce a refusal naming itself. Two of them
+are the reason the layer exists at all: a sentence that is genuinely in the article but
+outside the characters that were sent is refused as *remembered rather than read*, and an
+index of digests alone starts no conversation, because every answer it could have accepted
+would have been unchecked.
+
+Two commands ask the law layer questions without a client or a table. One re-hashes the
+harvest and reports whether the index still matches the articles it was built from. The
+other puts one engagement to a real endpoint and prints, per role, whether the model decided,
+refused or never answered — and it exits non-zero when no key is configured, because a run
+that quietly printed twelve rules answers would look exactly like a run that asked a model.

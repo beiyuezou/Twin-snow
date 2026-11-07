@@ -41,6 +41,45 @@ zero breach, one silent, and four findings that bind somebody. The corpus is fou
 engagements across seven fictional companies, and the numbers above are what the machine
 returned, not what was expected of it.
 
+## Who decides, and who checks
+
+The verdict is the model's, when a model is wired in. Each role's answer - verdict,
+sentence, the article it is standing on, and the colleague it asks to act - comes back from
+the endpoint, and the firm files it only if the machine can check it. The checks need no
+opinion about language. Seven of them, each one a fact about text:
+
+- the verdict is a word this firm recognises, and there is a sentence to read at all, of a
+  length a card can hold;
+- the answer names a passage, and that passage is one of the six that were sent to it;
+- the passage resolves in the harvest under the reference and digest the answer repeated;
+- the quote is inside the text that was sent, word for word - not inside the model's
+  recollection of a regulation, which is the failure all of this exists to catch;
+- every figure the sentence speaks is the client's own or sits inside that quote;
+- the facts it says it leaned on are facts it was handed;
+- the colleague it asks to act is a role of this firm, and is not itself.
+
+For the quote check to mean anything, the law has to be addressable rather than merely
+stored, so the 299 articles are indexed: each one has an id, can be searched by a question,
+and is kept with the digest of its own text. That is what lets a citation be resolved and a
+quote matched against the bytes instead of against anybody's memory of them. The same reason
+decides what goes into the ask: none of the figures the firm derived from the harvest is in
+it, neither among the facts the model is handed nor anywhere else, because an answer that
+could copy the right number out of its own prompt has been checked by nothing. Each role's
+question is searched on its own words too - putting the client's file into the search was
+tried, and measured, and it returned the same three articles to all twelve roles.
+
+A judgement that fails a check is not filed, and it is not quietly swapped out either. The
+deterministic rule stands in - its verdict, its words, its article - and the route says that
+this happened and names the check that refused. The same is said when the endpoint never
+answers, and when the harvested text is not on this machine at all, in which case no request
+is spent: nothing could have been checked, and a card crediting the model with a decision no
+machine could have verified would be reporting a thing that cannot happen.
+
+That is the deliberate half of the deal. A checked judgement can still disagree with the
+answer the rules would have given, and no check can notice, because the checks are about
+traceability and not about being right. What bounds it is what bounded it before: no agent
+signs, no model moves a threshold, and a person reads the sentence.
+
 ## The contract
 
 The roles do not only email each other. They are registered on a Solidity engagement
@@ -94,14 +133,20 @@ current.
 
 The card states how many figures were derived out of how many articles, which engagement was
 put to the firm, the verdict tally, the one finding that costs the most to leave out, how
-many agreements are on the contract, how many wait for a signature, and which route the
-words came from. With no model credential that line reads "the words above came from the
-rules route", and it is true: the whole subsystem runs with nothing paid for.
+many agreements are on the contract, and how many wait for a signature. It also says who wrote
+what. The leading sentence carries a byline - the model, or the rule that stood in for it and
+why - and the line under it counts the whole review from each finding's own route rather than
+from one route for the engagement, because one ask can be refused and the next accepted. With
+no model credential every byline reads "rules" and the count collapses to "the words above came
+from the rules route", which is true: the whole subsystem runs with nothing paid for.
 
 ## What is not claimed
 
 No public network. No human signature authority. No trained weights. No materiality
 percentage. The corpus is a snapshot of what open EU sources served at one time on one
 machine, and a figure whose harvest cannot be reproduced should be treated as wrong until it
-is. The rules route is what was exercised here; a model route was never given a key, so the
-firm's sentences came from the same deterministic planner as everything else in this project.
+is. The model route has never been asked of a real endpoint on this machine either: the
+judgement, the seven checks and the fallbacks are exercised against a miniature gateway that
+answers the way Meta's does, on a socket, with a key that is a string in a test. So every
+verdict logged here, and every sentence the example card shows, came from the rules - and the
+card says so, which is the only part of this that a reader has to take on trust.

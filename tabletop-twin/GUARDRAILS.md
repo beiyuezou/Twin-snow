@@ -138,6 +138,33 @@ its own rule removed, and each still produces the failure it was seeded with. Th
 counted in the same 18 controls as the six above, not kept in a separate tally that
 flatters the total.
 
+## Once the model decides, the checks move, they do not go away
+
+The sixth sentence above - a model may not move a threshold - is the one that used to carry
+the whole of the firm's distance from the model, because the model only ever wrote a caption
+under a verdict the rules had reached. Now the verdict, the sentence, the article and the
+colleague being asked to act all come from the endpoint, and what stands between that and an
+agreement is a list of checks that need no opinion about language: the verdict is a word this
+firm has, the quote is inside the passage that was actually sent, the passage resolves in the
+harvest under the reference and digest it repeats, every figure spoken belongs to the client's
+file or to the quote, the facts leaned on were handed over, the colleague exists and is not the
+one answering.
+
+Three of those are worth naming for what they catch. The quote is matched against the text
+that went out and not against the article as a whole, so a sentence that is genuinely in the
+law but was never shown is refused as remembered rather than read - which is the model's
+normal failure, and the one a fluent answer hides best. The derived thresholds are kept out
+of the ask entirely, because a prompt containing the answer turns the number check into
+copying. And when the harvest's text is not on the machine, no request is made: an index of
+digests can prove a citation exists but cannot prove a quote is honest, so the alternative to
+checking is not a weaker check, it is silence, and the route says that in words.
+
+What a guard does *not* do here is decide whether the answer is right. A checked judgement can
+disagree with the one the rules would have reached, and nothing notices, because the checks are
+about traceability. That is the part of the deal the previous section was written to keep small:
+the model cannot move a figure, cannot sign, and cannot stop a rule from speaking when its own
+answer cannot be traced back to a passage - and the substitution is reported rather than hidden.
+
 ## A second authority, which can say no twice
 
 The firm's agreements are written to a contract, and the contract is not this service.

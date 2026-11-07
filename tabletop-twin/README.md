@@ -181,8 +181,12 @@ Three things keep it honest, and they are the reason it lives here rather than b
   signature is shown as a state the table is in.
 
 [`FIRM.md`](FIRM.md) covers the harvest, the verdicts, the contract and what the card is
-allowed to claim. The whole subsystem runs with no paid credential: with no model key the
-firm answers from the same rule planner as the twin, and says so on the card.
+allowed to claim. Where the twin only lets a model choose and explain, the firm goes further
+and lets the model decide: given a key, each role's verdict comes from the endpoint, and the
+service files it only after checking it against the text of the law it claims to quote - and
+when the check refuses, the rule answers instead and the card says which of the two spoke.
+With no key, which is how this machine runs, all twelve answers come from the same rule
+planner as the twin, and say so.
 
 ## Accessibility
 
@@ -285,10 +289,11 @@ from then on.
 
 ## Verification status
 
-The service is covered by 388 tests that run the forecast, the forks, the policy
+The service is covered by 426 tests that run the forecast, the forks, the policy
 engine, the guardrails in front of it, the payment state machine, the settlement catalog,
-the accounts, the world a device opens for itself, the audit trail, the twelve roles and
-the contract they write to, the real PayPal transport and the Muse route —
+the accounts, the world a device opens for itself, the audit trail, the twelve roles, the
+law they cite and the checks that decide whether a citation is good enough to file, the
+contract they write to, the real PayPal transport and the Muse route —
 each of the last two against a gateway that answers on a socket, so a refused credential,
 a rate limit, a reply that never arrives, a stream that invents a figure mid-sentence and
 a gateway that refuses one request shape are all exercised here rather than discovered in
@@ -301,11 +306,11 @@ to check that there is something to guard. No test ever holds a real credential:
 environment is emptied around every one of them, and a test that wants an endpoint stands
 it up itself. The whole suite runs against a real PostgreSQL server, one schema per test,
 and the run above was measured against a server started from the packaged binaries on this
-machine: 388 passed in 212.22 seconds, on a run that shared the machine with the dev
-server, the service and a chain node, against 91.14 seconds for 328 tests with nothing else
-on it. It was 287 tests in 41 seconds against the file it
-replaced, and the gap is part more tests and part a socket instead of a memory-mapped file.
-It is bought back the first time a world has to survive onto a different host.
+machine: 426 passed in 337.11 seconds. It was 388 in 212.22 seconds before the law was
+indexed and the judgements put to a gateway, 328 in 91.14 seconds before the socket
+gateways, and 287 in 41 seconds against the file the database replaced — the growth is part
+more tests and part a socket instead of a memory-mapped file. It is bought back the first
+time a world has to survive onto a different host.
 
 That last habit is now a file of its own. Six failures with known answers — a payment
 left in a state nobody owns, a rail the catalog says cannot reach a country, a narration
@@ -467,6 +472,26 @@ count rose to eight — cumulative counts off the chain, not a client keeping it
 Every string the card prints was then scanned across all fourteen engagements: the only
 non-ASCII character in any response is inside the quoted article text, which the card does
 not display, so nothing reaches the atlas gap the money panel's separator fell into.
+
+The twelve answers are no longer written by this program. Each role's verdict, its sentence,
+the article it stands on and the colleague it asks to act now come from the endpoint when one
+is configured, and the service files an answer only after checking it against the text it
+claims to quote: the 299 articles are indexed by id and by the digest of their own bytes, so a
+citation resolves to a stored article and a quote is matched against the characters that were
+sent, not against a memory of a regulation. Everything said above about what happens then was
+run against the localhost stand-in and never against a paid endpoint. A review of twelve roles
+asked over a socket files twelve judgements carrying the model's verdict rather than the rule's;
+the same review with one thing bent at a time - a quote the harvest never
+printed, a figure belonging to nobody, a reference that fights its own passage id, a role
+asking itself to act, a sentence reaching past the window that was sent - returns the rule's
+words instead, with the refusing check named in the route. One of those runs has eight accepted
+and four refused, because a route that belongs to a judgement rather than to an engagement is
+worth nothing unless a review can carry two authors at once - which is what the card's byline,
+and the count under it, now read off each finding. That last piece is client code the build and
+typecheck cover; the panel's live text was read out of the running app before the byline
+existed, and what the browser has not re-read since is the words around it, not the figures.
+The command that puts one engagement to a real endpoint exits non-zero when no key is set, so a
+run that quietly printed twelve rules answers cannot be mistaken for a run that asked a model.
 
 What a browser still cannot do is the headset. The token is picked up by a near grab and
 held there by a squeeze, the wheel turns under a hand, and none of that has been watched
