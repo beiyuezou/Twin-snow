@@ -1,7 +1,8 @@
-"""The audit subsystem: a statutory-audit firm of twelve agents, calibrated on harvested
+"""The audit subsystem: a statutory-audit firm of eighteen agents, calibrated on harvested
 EU law and statistics, whose agreements between agents are settled on a real contract.
 
-`corpus` fetches, `priors` derives the numbers, `agents` runs the firm, `a2a` carries the
-traffic and `contract` talks to the chain. None of it needs a model key; a key only changes
-which route proposes the words.
+`corpus` fetches, `priors` derives the numbers and the worded provisions, `agents` runs the firm,
+`index` makes the articles searchable and `judge` lets a model decide from them, `a2a` carries the
+traffic and `chain` talks to the contract. None of it needs a model key; a key only changes which
+route answers each question.
 """

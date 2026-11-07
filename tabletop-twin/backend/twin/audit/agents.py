@@ -1,17 +1,19 @@
-"""The twelve agents, and the line each of them is not allowed to cross.
+"""The eighteen agents, and the line each of them is not allowed to cross.
 
 Every question the firm asks of a case has one answer from one place: the sentence in the
 harvested EU text that states the rule. Where the corpus states a number, the agent quotes it
 and the article it came from. Where it does not - materiality is an auditing standard's
 judgement, not a figure in a regulation - the agent says so and stops, because an agent that
-invents a threshold is worse than one that admits it has none. Three of the twelve roles end up
-telling a human that the decision is theirs, which is the correct output, not a failure.
+invents a threshold is worse than one that admits it has none. A role that is handed a file which
+does not answer its question returns `silent` rather than a guess, so the human reading the table
+can tell the difference between a clean engagement and an empty one.
 
 A model decides nothing here, and that is the point of this file: every verdict below is arithmetic
-on a figure the corpus was calibrated against, so the twelve answers stand with no endpoint, no key
-and no network. `ModelWords` is the only place Muse reaches in, and it reaches in at the wording -
-handed the figures a finding was computed from and asked for one sentence about them, with every
-number in the reply checked against that list and an invented one dropped for the rule's own words.
+on a figure the corpus was calibrated against, or a reading of a sentence the corpus states in
+words, so the eighteen answers stand with no endpoint, no key and no network. `ModelWords` is the
+only place Muse reaches in, and it reaches in at the wording - handed the figures a finding was
+computed from and asked for one sentence about them, with every number in the reply checked against
+that list and an invented one dropped for the rule's own words.
 The verdict, the threshold and the arithmetic come from the derived priors, because a route that
 cannot be trusted with arithmetic cannot be trusted with a statutory limit either.
 
@@ -72,6 +74,23 @@ class Case:
     firm_total_fees_cents: int = 0
     kyc_checked_years_ago: int = 0
     file_retention_years: int = 0
+    # The six questions added after the first twelve are answered from sentences the corpus states in
+    # words rather than figures, so their facts are the kind a client's file records in passing: how
+    # the fee was agreed, which years the non-audit work has run, whether the firm's own register
+    # entry is there. The empty values are not "no". They mean the file says nothing, and a role that
+    # was given nothing says so rather than guessing.
+    fee_arrangement: str = ""
+    non_audit_years: int = 0
+    prior_audit_fees_cents: tuple[int, ...] = ()
+    prior_non_audit_fees_cents: tuple[int, ...] = ()
+    months_since_year_end: int = 0
+    transparency_published: bool = False
+    transparency_kept_years: int = 0
+    audit_report_issued: bool = False
+    committee_report_issued: bool = False
+    register_status: str = ""
+    register_particulars: tuple[str, ...] = ()
+    sustainability_assurance: bool = False
 
     def dependence_percent(self) -> float:
         """What share of the firm's fees this one client is."""
@@ -121,6 +140,7 @@ class Priors:
     def __init__(self, doc: dict[str, Any]) -> None:
         self.doc = doc
         self.services = doc.get("non_audit_services") or {}
+        self.provisions = doc.get("provisions") or {}
 
     @classmethod
     def load(cls, file: str | Path | None = None) -> "Priors":
@@ -153,6 +173,31 @@ class Priors:
     def where(self, name: str) -> str:
         cite = self.cite(name)
         return f" ({cite['celex']} art {cite['article']})" if cite.get("celex") else ""
+
+    def provision(self, name: str) -> dict[str, Any]:
+        """One quoted sentence that states a rule with no figure in it, or an empty dict.
+
+        The calibration writes an entry for every provision it was asked to look for, including the
+        ones the corpus does not state, so the empty entry has to read as the absence it is. This is
+        the same promise `value()` makes about a number: a role that asks whether the text says
+        something must not be handed a blank page and told it is a sentence.
+        """
+        found = self.provisions.get(name) or {}
+        return found if found.get("quote") else {}
+
+    def provision_cite(self, name: str, quote: str = "") -> dict[str, str]:
+        found = self.provision(name)
+        if not found:
+            return {"state": "not_in_corpus", "quote": ""}
+        return {
+            "celex": str(found.get("celex", "")), "article": str(found.get("article", "")),
+            "state": str(found.get("state", "")),
+            "quote": (quote or str(found.get("quote", "")))[:300],
+        }
+
+    def provision_where(self, name: str) -> str:
+        found = self.provision(name)
+        return (f" ({found['celex']} art {found['article']})" if found.get("celex") else "")
 
     def band(self, name: str) -> dict[str, Any]:
         return ((self.doc.get("size_bands") or {}).get("bands") or {}).get(name) or {}
@@ -190,7 +235,7 @@ def _derogation(priors: Priors, letter: str) -> list[str]:
     return ((priors.services.get("derogation") or {}).get("points") or {}).get(letter, [])
 
 
-# ------------------------------------------------------------------ the twelve questions
+# ------------------------------------------------------------------ the eighteen questions
 
 def engagement_partner(case: Case, p: Priors) -> Finding:
     """May this firm still be the auditor? Tenure is a ceiling in the Regulation, not a habit.
@@ -534,6 +579,302 @@ def quality_review_partner(case: Case, p: Priors) -> Finding:
                    "engagement-partner")
 
 
+def contingent_fee_reviewer(case: Case, p: Priors) -> Finding:
+    """How the fee was agreed. One sentence forbids an answer, and it needs no arithmetic.
+
+    Article 4(1) is about the firm's own money: a fee "calculated on a predetermined basis relating to
+    the outcome or result of a transaction" is out whoever set it, and there is no figure to compare.
+    An entity the Regulation does not reach is not unspeaked either - Article 25 of the Directive makes
+    Member States keep rules to the same effect for every statutory audit - so this role cites one
+    article or the other according to the client instead of falling silent on half the roster.
+    """
+    asks = "was the audit fee agreed without reference to the outcome"
+    name = "contingent_audit_fees" if case.is_pie else "contingent_audit_fees_directive"
+    cite = p.provision_cite(name)
+    numbers = {"fee_arrangement": case.fee_arrangement or "not stated", "audit_fee_cents": case.audit_fee_cents,
+               "is_public_interest_entity": case.is_pie, "provision": name}
+    if not p.provision(name):
+        return Finding("contingent-fee-reviewer", asks, SILENT,
+                       "The corpus holds no sentence about how an audit fee may be calculated, so this"
+                       f" firm has no wording to test {case.client}'s against.", numbers, cite)
+    if not case.fee_arrangement:
+        return Finding("contingent-fee-reviewer", asks, SILENT,
+                       f"The file states what {case.client} pays but not how the figure was arrived at,"
+                       f" and this firm will not read a silence as a fee fixed in advance.", numbers, cite)
+    if "contingent" in case.fee_arrangement.lower() or "outcome" in case.fee_arrangement.lower():
+        return Finding("contingent-fee-reviewer", asks, BREACH,
+                       f"The fee is {case.fee_arrangement}, which is the arrangement the text rules out"
+                       f"{p.provision_where(name)}.", numbers, cite)
+    return Finding("contingent-fee-reviewer", asks, CLEAR,
+                   f"The fee is {case.fee_arrangement}, not a fee contingent on the result of the audit"
+                   f" or of any transaction in it{p.provision_where(name)}.", numbers, cite)
+
+
+def multi_year_fee_reviewer(case: Case, p: Priors) -> Finding:
+    """Article 4(2)'s ceiling, which is an average over years this file may not hold.
+
+    Two figures arrive in one sentence: the number of consecutive years of non-audit work that brings
+    the ceiling into play, and the number of years whose audit fees it averages over. The corpus states
+    both as three and the role says which of the two it is applying at each turn. Where the file carries
+    fewer years than the text averages, the honest answer is that the arithmetic cannot be done yet -
+    not that it comes out clear, which is what a single-year ratio would have said.
+    """
+    asks = "is the non-audit fee limited to a share of the average audit fee of the last financial years"
+    lookback = p.value("non_audit_lookback_years")
+    cap = p.value("non_audit_fee_cap_percent")
+    cite = p.cite("non_audit_lookback_years")
+    numbers = {"non_audit_years": case.non_audit_years, "lookback_years": lookback,
+               "prior_audit_fees_cents": list(case.prior_audit_fees_cents),
+               "prior_non_audit_fees_cents": list(case.prior_non_audit_fees_cents),
+               "cap_percent": cap}
+    if lookback is None or cap is None:
+        return Finding("multi-year-fee-reviewer", asks, SILENT,
+                       "Neither the averaging window nor the ceiling was derived from the corpus, so"
+                       f" there is no multi-year test to put {case.client} to.", numbers, cite)
+    need = int(lookback)
+    numbers["years_until_ceiling"] = max(need - case.non_audit_years, 0)
+    if case.non_audit_years < need:
+        return Finding("multi-year-fee-reviewer", asks, CLEAR,
+                       f"{case.non_audit_years} consecutive year(s) of non-audit work, where the ceiling"
+                       f" falls on a firm that has provided them for {lookback:g} or more"
+                       f"{p.where('non_audit_lookback_years')} - it becomes payable in"
+                       f" {numbers['years_until_ceiling']} year(s).", numbers, cite)
+    audit = case.prior_audit_fees_cents[-need:]
+    non_audit = case.prior_non_audit_fees_cents[-need:]
+    numbers["years_stated"] = {"audit": len(audit), "non_audit": len(non_audit)}
+    if len(audit) < need or len(non_audit) < need:
+        return Finding("multi-year-fee-reviewer", asks, HOLD,
+                       f"The text averages the last {need} years and the file states {len(audit)} audit"
+                       f" and {len(non_audit)} non-audit figure(s) for them, so the ceiling has a"
+                       f" denominator this firm has not been given.", numbers, cite, "engagement-partner")
+    average_audit = sum(audit) / need
+    average_non_audit = sum(non_audit) / need
+    allowed = round(average_audit * cap / 100.0)
+    ratio = round(100.0 * average_non_audit / average_audit, 2) if average_audit else 0.0
+    numbers.update({"average_audit_fee_cents": round(average_audit),
+                    "average_non_audit_fee_cents": round(average_non_audit),
+                    "allowed_average_cents": allowed, "percent_of_average_audit_fee": ratio})
+    over = average_non_audit > allowed
+    return Finding("multi-year-fee-reviewer", asks, BREACH if over else CLEAR,
+                   f"Across the {need} years on file the non-audit average is"
+                   f" {round(average_non_audit)} cents against a {ratio:g}% ratio and a {cap:g}% ceiling"
+                   f" (allowed {allowed} cents){p.where('non_audit_fee_cap_percent')}.",
+                   numbers, p.cite("non_audit_fee_cap_percent"),
+                   "" if over else "engagement-partner")
+
+
+def transparency_report_reviewer(case: Case, p: Priors) -> Finding:
+    """The report the firm owes the public, on the clock the Regulation sets it.
+
+    Article 13 is the one obligation in the corpus that runs against this firm rather than against its
+    client: the annual transparency report is due four months after the year end and has to stay on the
+    website for five years. Both numbers come out of the article and both have an expiry, which is why
+    a published report is not automatically a clear one - and why a file that says it was published but
+    not for how long gets a hold rather than a tick.
+    """
+    asks = "is this year's transparency report published and still available"
+    deadline = p.value("transparency_report_deadline_months")
+    floor = p.value("transparency_report_available_years")
+    cite = p.cite("transparency_report_deadline_months")
+    numbers = {"is_public_interest_entity": case.is_pie, "months_since_year_end": case.months_since_year_end,
+               "transparency_published": case.transparency_published,
+               "transparency_kept_years": case.transparency_kept_years,
+               "deadline_months": deadline, "available_years_floor": floor}
+    if deadline is None or floor is None:
+        return Finding("transparency-report-reviewer", asks, SILENT,
+                       "The corpus states neither the publication window nor the period the report has to"
+                       " stay available, so this firm has no date to work to.", numbers, cite)
+    if not case.is_pie:
+        return Finding("transparency-report-reviewer", asks, SILENT,
+                       f"Article 13 binds a firm that audits public-interest entities, and this"
+                       f" engagement's client is not one{p.where('transparency_report_deadline_months')}.",
+                       numbers, cite)
+    numbers["months_left"] = max(deadline - case.months_since_year_end, 0)
+    if not case.transparency_published:
+        if case.months_since_year_end >= deadline:
+            return Finding("transparency-report-reviewer", asks, BREACH,
+                           f"{case.months_since_year_end} months have gone since the year end and the"
+                           f" report is not published, where the text allows {deadline:g}"
+                           f"{p.where('transparency_report_deadline_months')}.", numbers, cite)
+        return Finding("transparency-report-reviewer", asks, HOLD,
+                       f"The report is unpublished with {numbers['months_left']} of the {deadline:g} months"
+                       f" still to run{p.where('transparency_report_deadline_months')}; nothing is late yet.",
+                       numbers, cite, "quality-review-partner")
+    if case.transparency_kept_years <= 0:
+        return Finding("transparency-report-reviewer", asks, HOLD,
+                       f"The report is published and the file says nothing about how long it stays up,"
+                       f" where the text requires at least {floor:g} years"
+                       f"{p.where('transparency_report_available_years')}.",
+                       numbers, p.cite("transparency_report_available_years"), "quality-review-partner")
+    if case.transparency_kept_years < floor:
+        return Finding("transparency-report-reviewer", asks, BREACH,
+                       f"The report is kept for {case.transparency_kept_years} years where the text sets a"
+                       f" floor of {floor:g}{p.where('transparency_report_available_years')}.",
+                       numbers, p.cite("transparency_report_available_years"))
+    return Finding("transparency-report-reviewer", asks, CLEAR,
+                   f"Published {case.months_since_year_end} month(s) after the year end, inside the"
+                   f" {deadline:g}-month window, and kept for {case.transparency_kept_years} years against"
+                   f" a floor of {floor:g}{p.where('transparency_report_available_years')}.",
+                   numbers, p.cite("transparency_report_available_years"))
+
+
+def committee_report_reviewer(case: Case, p: Priors) -> Finding:
+    """Article 11: the committee's report is due no later than the audit report itself.
+
+    The deadline is not a date in the calendar, it is the moment another document goes out, which makes
+    this the one role that can only answer once the file says what has been issued. Two states are
+    therefore silent or held rather than clear: a client the Regulation does not reach, and an audit
+    report that has not been submitted, because in the second case nothing is late and the firm is only
+    early.
+    """
+    asks = "was the additional report given to the audit committee in time"
+    cite = p.provision_cite("additional_report_to_committee")
+    numbers = {"is_public_interest_entity": case.is_pie, "audit_report_issued": case.audit_report_issued,
+               "committee_report_issued": case.committee_report_issued}
+    if not p.provision("additional_report_to_committee"):
+        return Finding("committee-report-reviewer", asks, SILENT,
+                       "The corpus does not carry the sentence that sets this deadline.", numbers, cite)
+    if not case.is_pie:
+        return Finding("committee-report-reviewer", asks, SILENT,
+                       f"Article 11 obliges an additional report where a public-interest entity is"
+                       f" audited, and {case.client} is not one{p.provision_where('additional_report_to_committee')}.",
+                       numbers, cite)
+    if case.committee_report_issued:
+        return Finding("committee-report-reviewer", asks, CLEAR,
+                       f"The additional report has been submitted to the audit committee, which is what"
+                       f" the text requires before or with the audit report"
+                       f"{p.provision_where('additional_report_to_committee')}.", numbers, cite)
+    if case.audit_report_issued:
+        return Finding("committee-report-reviewer", asks, BREACH,
+                       f"The audit report has been submitted and the additional report has not, so the"
+                       f" deadline the text sets - the date of that submission - has passed"
+                       f"{p.provision_where('additional_report_to_committee')}.", numbers, cite)
+    return Finding("committee-report-reviewer", asks, HOLD,
+                   f"Neither report has gone out, so nothing is late yet and the committee's document is"
+                   f" owed no later than the audit report{p.provision_where('additional_report_to_committee')}.",
+                   numbers, cite, "audit-committee-liaison")
+
+
+def register_entry_reviewer(case: Case, p: Priors) -> Finding:
+    """Whether this firm's own name is in the register, with the particulars the Directive lists.
+
+    Article 16 speaks about the register rather than about the engagement: it is one of the two places in
+    this harvest where the text is addressed at the firm instead of the client, and the only one where
+    what has to be true is a record about the firm itself. The lettered particulars are read out of the
+    sentence, so the number of items this role expects is the number the text prints - three today, and
+    whatever an amendment makes it next. An entry that states two of the three is a hold rather than a
+    breach: the Directive tells Member States what their registers must carry, and a partial entry is a
+    thing a person has to go and fix.
+    """
+    asks = "does the public register contain this firm's name, address and registration number"
+    found = p.provision("public_register_particulars")
+    required = [str(letter) for letter in (found.get("points") or [])]
+    stated = [str(letter).strip("()") for letter in case.register_particulars]
+    missing = [letter for letter in required if letter not in stated]
+    cite = p.provision_cite("public_register_particulars")
+    numbers = {"register_status": case.register_status or "not stated",
+               "particulars_stated": stated, "particulars_required": required,
+               "particulars_missing": missing}
+    if not found:
+        return Finding("register-entry-reviewer", asks, SILENT,
+                       "The corpus holds no article on what the public register must contain.", numbers, cite)
+    if not case.register_status:
+        return Finding("register-entry-reviewer", asks, SILENT,
+                       "The file says nothing about this firm's own register entry, and an absence of"
+                       f" evidence is not a breach of Article {found['article']}.", numbers, cite)
+    if not case.register_status.lower().startswith("registered"):
+        return Finding("register-entry-reviewer", asks, BREACH,
+                       f"The firm's entry reads '{case.register_status}' where Article {found['article']}"
+                       f" requires the auditor to be in the public register"
+                       f"{p.provision_where('public_register_particulars')}.", numbers, cite)
+    if not required:
+        return Finding("register-entry-reviewer", asks, HOLD,
+                       f"The firm is registered and the text's list of particulars could not be read out"
+                       f" of it, so completeness is a judgement this firm will not make up"
+                       f"{p.provision_where('public_register_particulars')}.", numbers, cite,
+                       "quality-review-partner")
+    if missing:
+        return Finding("register-entry-reviewer", asks, HOLD,
+                       f"Registered, but the entry states part(s) {_letters(stated)} where the article"
+                       f" lists {_letters(required)} - missing {_letters(missing)}"
+                       f"{p.provision_where('public_register_particulars')}.",
+                       numbers, cite, "quality-review-partner")
+    return Finding("register-entry-reviewer", asks, CLEAR,
+                   f"The entry states each of parts {_letters(required)} that Article {found['article']}"
+                   f" lists{p.provision_where('public_register_particulars')}.", numbers, cite)
+
+
+def sustainability_assurance_reviewer(case: Case, p: Priors) -> Finding:
+    """Article 25c: the same prohibition again, one layer wider, for a firm that assures reporting.
+
+    A firm that carries out the assurance of a public-interest entity's sustainability reporting is told
+    which points of the Article 5(1) list it may not sell to that entity - and the list is a subset, so
+    the answer here is not the independence monitor's answer. Which points is read out of the sentence
+    rather than copied into this file, and the services themselves come from the same derived Article 5
+    categories, which is why a request that matches a point outside the subset is cleared rather than
+    escalated: the text forbids nine of eleven things here, and pretending otherwise would be this
+    firm's caution, not the law's.
+    """
+    asks = "may this firm both assure the reporting and sell the services asked for"
+    found = p.provision("sustainability_service_prohibition")
+    prohibited = [str(letter) for letter in (found.get("points") or [])]
+    cite = p.provision_cite("sustainability_service_prohibition")
+    numbers = {"sustainability_assurance": case.sustainability_assurance,
+               "requested": list(case.non_audit_services), "prohibited_points": prohibited,
+               "is_public_interest_entity": case.is_pie}
+    if not found:
+        return Finding("sustainability-assurance-reviewer", asks, SILENT,
+                       "The corpus holds no article tying the prohibition to sustainability assurance.",
+                       numbers, cite)
+    if not case.sustainability_assurance:
+        return Finding("sustainability-assurance-reviewer", asks, SILENT,
+                       f"This firm carries out no assurance of {case.client}'s sustainability reporting,"
+                       f" so Article {found['article']} has nothing to reach{p.provision_where('sustainability_service_prohibition')}.",
+                       numbers, cite)
+    if not case.non_audit_services:
+        return Finding("sustainability-assurance-reviewer", asks, CLEAR,
+                       f"The assurance engagement stands alone: no non-audit service is requested, so none"
+                       f" of points {_letters(prohibited)} is engaged{p.provision_where('sustainability_service_prohibition')}.",
+                       numbers, cite, "engagement-partner")
+    breaches, outside, weak = [], [], []
+    for request in case.non_audit_services:
+        category, score = match_service(request, p)
+        letter = str(category.get("letter", ""))
+        entry = {"asked": request, "point": letter, "words_in_common": score,
+                 "text": (category.get("text") or "")[:180]}
+        numbers.setdefault("matches", []).append(entry)
+        if score < 1 or not letter:
+            weak.append(entry)
+        elif letter in prohibited and score >= 2:
+            breaches.append((category, entry))
+        elif score >= 2:
+            outside.append(entry)
+        else:
+            weak.append(entry)
+    if breaches:
+        category, entry = breaches[0]
+        return Finding("sustainability-assurance-reviewer", asks, BREACH,
+                       f"'{entry['asked']}' is point ({entry['point']}) of the prohibition,"
+                       f" and Article {found['article']} repeats that point among the services a firm"
+                       f" assuring sustainability reporting may not provide"
+                       f"{p.provision_where('sustainability_service_prohibition')}.", numbers, cite)
+    if weak:
+        return Finding("sustainability-assurance-reviewer", asks, HOLD,
+                       f"{', '.join(repr(e['asked']) for e in weak)} share too few words with the"
+                       f" prohibition to be placed in it, and this role cannot tell whether the point is"
+                       f" inside Article {found['article']}'s subset without placing it.",
+                       numbers, cite, "audit-committee-liaison")
+    return Finding("sustainability-assurance-reviewer", asks, CLEAR,
+                   f"The requested services fall outside points {_letters(prohibited)} - the ones Article"
+                   f" {found['article']} carries across to a sustainability assurance engagement"
+                   f"{p.provision_where('sustainability_service_prohibition')}.", numbers, cite,
+                   "audit-committee-liaison")
+
+
+def _letters(letters: list[str]) -> str:
+    return ", ".join(f"({letter})" for letter in letters) or "none"
+
+
 QUESTIONS: tuple[tuple[str, Callable[[Case, Priors], Finding]], ...] = (
     ("engagement-partner", engagement_partner),
     ("rotation-tracker", rotation_tracker),
@@ -547,6 +888,12 @@ QUESTIONS: tuple[tuple[str, Callable[[Case, Priors], Finding]], ...] = (
     ("tender-administrator", tender_administrator),
     ("materiality-reviewer", materiality_reviewer),
     ("quality-review-partner", quality_review_partner),
+    ("contingent-fee-reviewer", contingent_fee_reviewer),
+    ("multi-year-fee-reviewer", multi_year_fee_reviewer),
+    ("transparency-report-reviewer", transparency_report_reviewer),
+    ("committee-report-reviewer", committee_report_reviewer),
+    ("register-entry-reviewer", register_entry_reviewer),
+    ("sustainability-assurance-reviewer", sustainability_assurance_reviewer),
 )
 
 ROLES = tuple(role for role, _ in QUESTIONS)
@@ -603,7 +950,7 @@ class ModelWords:
 
 
 class Firm:
-    """Asks the twelve questions of a case, then turns the answers into traffic on the chain."""
+    """Asks the eighteen questions of a case, then turns the answers into traffic on the chain."""
 
     def __init__(self, priors: Priors | None = None, words: Any = None, judge: Any = None) -> None:
         self.priors = priors or Priors.load()

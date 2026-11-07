@@ -1,10 +1,10 @@
 """The one place the HTTP edge decides whether a chain is answering.
 
 The firm itself needs nothing from outside: `agents.Firm.review` reads the derived thresholds and
-answers twelve questions, and it does that with no key, no node process and no database. What it
+answers eighteen questions, and it does that with no key, no node process and no database. What it
 cannot do alone is turn an answer into an agreement somebody is bound by, and that is the only
 reason this module exists. It holds one connection and one decision — is there a contract, and are
-the twelve roles on it — and remembers the answer, because a request that re-asked would either
+the eighteen roles on it — and remembers the answer, because a request that re-asked would either
 hang a panel behind a dead sidecar or burn gas re-registering a role the registry already knows.
 
 With no chain the review still runs and still says what it thinks; `agreements` comes back empty
@@ -27,7 +27,7 @@ from twin.audit.finetune import sweep
 
 # A boot is not the place to wait twenty seconds for a node process that may never come.
 PROBE_TIMEOUT_SEC = 2.0
-# Once it has answered, though, one review is a dozen transactions and each one costs real gas.
+# Once it has answered, though, one review is a run of transactions and each one costs real gas.
 # A timeout is a statement about the call being made, so the connection a review uses is not
 # the one the probe used, even though it is the same sidecar.
 WORK_TIMEOUT_SEC = 20.0
@@ -160,7 +160,7 @@ class FirmService:
         return Bus(chain, store=store, user_id=user_id, day=day)
 
     def review(self, case: Case, store: Any, user_id: str, day: int) -> dict[str, Any]:
-        """Twelve answers, and the agreements they are entitled to open."""
+        """Eighteen answers, and the agreements they are entitled to open."""
         firm = Firm.from_env()
         bus = self.bus(store, user_id, day)
         if bus is None:

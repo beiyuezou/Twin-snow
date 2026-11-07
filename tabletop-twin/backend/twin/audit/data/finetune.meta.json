@@ -6,10 +6,10 @@
  },
  "counts": {
   "cases": 14,
-  "preference": 107,
-  "roles": 12,
-  "skipped": 2,
-  "supervised": 168
+  "preference": 110,
+  "roles": 18,
+  "skipped": 38,
+  "supervised": 252
  },
  "format": {
   "preference": "prompt/chosen/rejected per line, method type dpo",
@@ -21,11 +21,12 @@
   "auditor_return_cooldown_years": 1,
   "fee_dependence_percent": 14,
   "key_partner_rotation_years": 12,
-  "non_audit_fee_cap_percent": 14,
+  "non_audit_fee_cap_percent": 16,
   "participation_presumed_percent": 14,
   "partner_cooling_off_years": 1,
   "rotation_initial_max_years": 23,
-  "rotation_with_tender_max_years": 1
+  "rotation_with_tender_max_years": 1,
+  "transparency_report_available_years": 1
  },
  "prohibition": {
   "article": "5",
@@ -291,6 +292,127 @@
    "role": "quality-review-partner",
    "route": "rules",
    "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
   },
   {
    "cite": {
@@ -562,6 +684,127 @@
   },
   {
    "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
     "article": "17",
     "celex": "32014R0537",
     "quote": " the second subparagraph of paragraph 1 and in point (b) of paragraph 2; or (b) twenty four years, where, after the expiry of the maximum durations referred to in the second subparagraph of paragraph 1 and in point (b) of paragraph 2, more than one statutory auditor or audit firm is simultaneously e",
@@ -829,6 +1072,129 @@
   },
   {
    "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "s Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the fees paid in the last three consecutive financial years for the statutory audit(s) of the audited entity and, where applicable, of its parent undertaking, of its controlled undertakings and of ",
+    "state": "calibrated",
+    "value": "70.0"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0",
+    "0537",
+    "140000",
+    "200000",
+    "3",
+    "3.0",
+    "32014",
+    "35",
+    "35.0",
+    "4",
+    "70",
+    "70.0",
+    "70000"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Nordwind Textil AG",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
     "article": "17",
     "celex": "32014R0537",
     "quote": "Neither the initial engagement of a particular statutory auditor or audit firm, nor this in combination with any renewed engagements therewith shall exceed a maximum duration of 10 years.",
@@ -1086,6 +1452,126 @@
    "role": "quality-review-partner",
    "route": "rules",
    "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "25",
+    "celex": "32006L0043",
+    "quote": "Article 25 Audit fees Member States shall ensure that adequate rules are in place which provide that fees for statutory audits: (a) are not influenced or determined by the provision of additional services to the audited entity; (b) cannot be based on any form of contingency.",
+    "state": "quoted"
+   },
+   "client": "Halbe Druckerei GmbH",
+   "facts": [
+    "0043",
+    "200000",
+    "25",
+    "32006"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Halbe Druckerei GmbH",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "A statutory auditor or an audit firm that carries out statutory audits of public-interest entities shall make public an annual transparency report at the latest four months after the end of each financial year.",
+    "state": "calibrated",
+    "value": "4.0"
+   },
+   "client": "Halbe Druckerei GmbH",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Halbe Druckerei GmbH",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Halbe Druckerei GmbH",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Halbe Druckerei GmbH",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
   },
   {
    "cite": {
@@ -1351,6 +1837,127 @@
   },
   {
    "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Vantage Logistics NV",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "breach"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Vantage Logistics NV",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Vantage Logistics NV",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Vantage Logistics NV",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Vantage Logistics NV",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Vantage Logistics NV",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
     "article": "17",
     "celex": "32014R0537",
     "quote": "Neither the initial engagement of a particular statutory auditor or audit firm, nor this in combination with any renewed engagements therewith shall exceed a maximum duration of 10 years.",
@@ -1607,6 +2214,127 @@
    "role": "quality-review-partner",
    "route": "rules",
    "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
   },
   {
    "cite": {
@@ -1869,6 +2597,127 @@
   },
   {
    "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "breach"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
     "article": "17",
     "celex": "32014R0537",
     "quote": "Neither the initial engagement of a particular statutory auditor or audit firm, nor this in combination with any renewed engagements therewith shall exceed a maximum duration of 10 years.",
@@ -2125,6 +2974,127 @@
    "role": "quality-review-partner",
    "route": "rules",
    "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Sable Health Holdings SA",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "clear"
   },
   {
    "cite": {
@@ -2387,6 +3357,127 @@
   },
   {
    "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "s Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the fees paid in the last three consecutive financial years for the statutory audit(s) of the audited entity and, where applicable, of its parent undertaking, of its controlled undertakings and of ",
+    "state": "calibrated",
+    "value": "70.0"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0",
+    "0537",
+    "140000",
+    "140001",
+    "200000",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "breach"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
     "article": "17",
     "celex": "32014R0537",
     "quote": "Neither the initial engagement of a particular statutory auditor or audit firm, nor this in combination with any renewed engagements therewith shall exceed a maximum duration of 10 years.",
@@ -2645,6 +3736,129 @@
    "role": "quality-review-partner",
    "route": "rules",
    "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0",
+    "0537",
+    "1",
+    "100",
+    "140000",
+    "200000",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Meridian Utilities PLC",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
   },
   {
    "cite": {
@@ -2908,6 +4122,128 @@
   },
   {
    "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "2464",
+    "25",
+    "32022",
+    "5"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "breach"
+  },
+  {
+   "cite": {
     "article": "17",
     "celex": "32014R0537",
     "quote": "Neither the initial engagement of a particular statutory auditor or audit firm, nor this in combination with any renewed engagements therewith shall exceed a maximum duration of 10 years.",
@@ -3165,6 +4501,129 @@
    "client": "Kestrel Foods BV",
    "facts": [],
    "role": "quality-review-partner",
+   "route": "rules",
+   "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Kestrel Foods BV",
+   "facts": [
+    "1",
+    "100",
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
    "route": "rules",
    "verdict": "hold"
   },
@@ -3432,6 +4891,126 @@
   },
   {
    "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "A statutory auditor or an audit firm that carries out statutory audits of public-interest entities shall make public an annual transparency report at the latest four months after the end of each financial year.",
+    "state": "calibrated",
+    "value": "4.0"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0",
+    "0537",
+    "13",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0",
+    "6"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "breach"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
+  },
+  {
+   "cite": {
     "article": "17",
     "celex": "32014R0537",
     "quote": "Neither the initial engagement of a particular statutory auditor or audit firm, nor this in combination with any renewed engagements therewith shall exceed a maximum duration of 10 years.",
@@ -3690,9 +5269,190 @@
    "role": "quality-review-partner",
    "route": "rules",
    "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+    "state": "quoted"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0537",
+    "200000",
+    "32014",
+    "4"
+   ],
+   "role": "contingent-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "4",
+    "celex": "32014R0537",
+    "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the ",
+    "state": "calibrated",
+    "value": "3.0"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0537",
+    "1",
+    "100",
+    "2",
+    "3",
+    "3.0",
+    "32014",
+    "4",
+    "5",
+    "70",
+    "70.0"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "13",
+    "celex": "32014R0537",
+    "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+    "state": "calibrated",
+    "value": "5.0"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0",
+    "0537",
+    "13",
+    "2",
+    "2.0",
+    "32014",
+    "4",
+    "4.0",
+    "5",
+    "5.0"
+   ],
+   "role": "transparency-report-reviewer",
+   "route": "rules",
+   "verdict": "hold"
+  },
+  {
+   "cite": {
+    "article": "11",
+    "celex": "32014R0537",
+    "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+    "state": "quoted"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0537",
+    "10",
+    "11",
+    "32014"
+   ],
+   "role": "committee-report-reviewer",
+   "route": "rules",
+   "verdict": "clear"
+  },
+  {
+   "cite": {
+    "article": "16",
+    "celex": "32006L0043",
+    "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom ",
+    "state": "quoted"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "0043",
+    "16",
+    "32006"
+   ],
+   "role": "register-entry-reviewer",
+   "route": "rules",
+   "verdict": "breach"
+  },
+  {
+   "cite": {
+    "article": "25c",
+    "celex": "32022L2464",
+    "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject o",
+    "state": "quoted"
+   },
+   "client": "Aldermen Property Trust",
+   "facts": [
+    "2464",
+    "25",
+    "32022"
+   ],
+   "role": "sustainability-assurance-reviewer",
+   "route": "rules",
+   "verdict": "silent"
   }
  ],
  "skipped": [
+  {
+   "client": "Nordwind Textil AG",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Nordwind Textil AG",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Nordwind Textil AG",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Nordwind Textil AG",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Nordwind Textil AG",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Nordwind Textil AG",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
   {
    "client": "Nordwind Textil AG",
    "priors": [
@@ -3702,21 +5462,318 @@
    "why": "moving any of them leaves a sentence the case grounds"
   },
   {
+   "client": "Nordwind Textil AG",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Nordwind Textil AG",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Halbe Druckerei GmbH",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Vantage Logistics NV",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Vantage Logistics NV",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Vantage Logistics NV",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Sable Health Holdings SA",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Sable Health Holdings SA",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Sable Health Holdings SA",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Sable Health Holdings SA",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Sable Health Holdings SA",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Sable Health Holdings SA",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Sable Health Holdings SA",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Sable Health Holdings SA",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Sable Health Holdings SA",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Meridian Utilities PLC",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Meridian Utilities PLC",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Meridian Utilities PLC",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Meridian Utilities PLC",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Meridian Utilities PLC",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Kestrel Foods BV",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Kestrel Foods BV",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Kestrel Foods BV",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Kestrel Foods BV",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Kestrel Foods BV",
+   "priors": [
+    "aml_record_retention_years",
+    "delegation_period_years",
+    "transparency_report_available_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
    "client": "Aldermen Property Trust",
    "priors": [
     "aml_record_retention_years",
     "auditor_return_cooldown_years",
-    "delegation_period_years"
+    "delegation_period_years",
+    "transparency_report_available_years"
    ],
    "role": "aml-compliance-officer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Aldermen Property Trust",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Aldermen Property Trust",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Aldermen Property Trust",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "transparency-report-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Aldermen Property Trust",
+   "priors": [
+    "transparency_report_deadline_months"
+   ],
+   "role": "contingent-fee-reviewer",
+   "why": "moving any of them leaves a sentence the case grounds"
+  },
+  {
+   "client": "Aldermen Property Trust",
+   "priors": [
+    "auditor_return_cooldown_years",
+    "non_audit_lookback_years",
+    "partner_cooling_off_years",
+    "transparency_report_deadline_months"
+   ],
+   "role": "multi-year-fee-reviewer",
    "why": "moving any of them leaves a sentence the case grounds"
   }
  ],
  "trained_here": false,
  "verdicts": {
-  "breach": 8,
-  "clear": 105,
-  "hold": 40,
-  "silent": 15
+  "breach": 14,
+  "clear": 163,
+  "hold": 45,
+  "silent": 30
  }
 }

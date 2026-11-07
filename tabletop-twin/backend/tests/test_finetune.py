@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 
-from twin.audit.agents import Priors
+from twin.audit.agents import Priors, QUESTIONS
 from twin.audit.corpus import DATA_DIR
 from twin.audit.finetune import (AUDIT_FEE_CENTS, PREFERENCE, SIDECAR, SUPERVISED, Opener, build,
                                  check, dumps, shift, sweep, train, write)
@@ -164,17 +164,19 @@ def test_every_case_sits_on_a_boundary_it_was_derived_from():
 
 def test_the_corpus_covers_every_role_and_every_way_a_question_can_end(doc):
     rows = doc["meta"]["rows"]
-    assert len(rows) == len(sweep(Priors.load())) * 12
+    assert len(rows) == len(sweep(Priors.load())) * len(QUESTIONS)
     assert {row["role"] for row in rows} == {
         "engagement-partner", "rotation-tracker", "independence-monitor", "non-audit-assessor",
         "fraud-risk-assessor", "aml-compliance-officer", "evidence-archivist",
         "group-audit-coordinator", "audit-committee-liaison", "tender-administrator",
-        "materiality-reviewer", "quality-review-partner"}
+        "materiality-reviewer", "quality-review-partner", "contingent-fee-reviewer",
+        "multi-year-fee-reviewer", "transparency-report-reviewer", "committee-report-reviewer",
+        "register-entry-reviewer", "sustainability-assurance-reviewer"}
     verdicts = doc["meta"]["verdicts"]
     assert all(count > 0 for count in verdicts.values()), verdicts
     assert all(row["route"] == "rules" for row in rows), "a model wrote none of these sentences"
     silent = [row for row in rows if row["verdict"] == "silent"]
-    assert len(silent) >= 12, "one role in silence is an accident, not a taught answer"
+    assert len(silent) >= len(QUESTIONS), "one role in silence is an accident, not a taught answer"
 
 
 def test_the_silence_is_taught_as_an_answer(doc):

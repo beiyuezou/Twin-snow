@@ -23,7 +23,7 @@ from fastapi.testclient import TestClient
 
 from twin.api import main
 from twin.api.main import EngagementIn
-from twin.audit.agents import Case, Priors
+from twin.audit.agents import ROLES, Case, Priors
 from twin.audit.chain import spawn_sidecar
 from twin.audit.finetune import sweep
 from twin.store import drop_schema, schema_name
@@ -101,8 +101,9 @@ def signup(app: TestClient) -> dict:
 
 def test_a_brief_names_the_firm_and_says_why_it_has_no_chain(client):
     brief = client.get("/v1/firm").json()
-    assert len(brief["roles"]) == 12, "the roster is the firm; a panel that cannot see it sees nothing"
-    assert len({role["role"] for role in brief["roles"]}) == 12
+    assert len(brief["roles"]) == len(ROLES), (
+        "the roster is the firm; a panel that cannot see it sees nothing")
+    assert len({role["role"] for role in brief["roles"]}) == len(ROLES)
     assert all(role["title"] and role["principal"] for role in brief["roles"])
     calibrated = [card for card in brief["thresholds"] if card["state"] == "calibrated"]
     assert calibrated, "the firm is calibrated on the corpus or it is not the firm in this repo"
@@ -137,7 +138,7 @@ def test_a_review_without_a_chain_still_answers_and_says_what_it_withdrew(client
     reply = client.post("/v1/firm/review", json={"engagement": 0}, headers=headers)
     assert reply.status_code == 200, reply.text
     summary = reply.json()
-    assert len(summary["findings"]) == 12
+    assert len(summary["findings"]) == len(ROLES)
     assert summary["agreements"] == []
     assert summary["waiting_on_humans"] == []
     assert summary["chain"]["on_chain"] is False
@@ -180,7 +181,7 @@ def test_a_posted_list_of_services_arrives_as_the_engagement_declares_it(client,
     summary = client.post("/v1/firm/review",
                           json={"engagement": booked, "non_audit_services": list(named)},
                           headers=headers).json()
-    assert len(summary["findings"]) == 12
+    assert len(summary["findings"]) == len(ROLES)
     assert _finding(summary, "independence-monitor")["numbers"]["requested"] == list(named)
     withheld = client.post("/v1/firm/review", json={"engagement": booked}, headers=headers).json()
     assert _finding(withheld, "independence-monitor")["numbers"]["requested"] == list(named)
@@ -254,14 +255,14 @@ def test_a_named_chain_that_never_answers_costs_one_short_probe(client, monkeypa
 def test_boot_hires_every_role_once(live):
     audit = live.get("/v1/health").json()["audit"]
     assert audit["on_chain"] is True, audit
-    assert audit["hired"] == 12 and audit["refused"] == 0, audit
+    assert audit["hired"] == len(ROLES) and audit["refused"] == 0, audit
     brief = live.get("/v1/firm").json()
-    assert len(brief["chain"]["roles_on_chain"]) == 12
+    assert len(brief["chain"]["roles_on_chain"]) == len(ROLES)
     assert brief["chain"]["chain"]["cap_basis_points"] == 7000, "the deployed cap is the derived one"
     # And it does it once: the second look must not re-hire the firm.
     again = live.get("/v1/firm").json()
     assert again["chain"]["registration"] == brief["chain"]["registration"]
-    assert len([row for row in again["chain"]["registration"] if row["ok"]]) == 12
+    assert len([row for row in again["chain"]["registration"] if row["ok"]]) == len(ROLES)
 
 
 def test_a_review_opens_exactly_the_findings_that_bind(live, live_headers):

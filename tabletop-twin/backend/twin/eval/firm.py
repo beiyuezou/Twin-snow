@@ -377,27 +377,54 @@ def enforced_thresholds() -> set[str]:
 
     The corpus derives more figures than an agent enforces - the Commission's delegation period
     is not a rule a signing partner applies - so coverage is asked of the ones the source looks
-    up, not of everything the harvest happened to contain.
+    up, not of everything the harvest happened to contain. The leading dot keeps a sentence
+    lookup (`provision_cite("...")`) out of a number list it is not in.
     """
     source = inspect.getsource(agents)
-    read = set(re.findall(r'(?:value|cite|prior)\("([a-z_]+)"\)', source))
+    read = set(re.findall(r'\.(?:value|cite|prior)\("([a-z_]+)"\)', source))
     return {name for name in read if name != "materiality_percent_of_turnover"}
+
+
+def enforced_provisions(p: Priors) -> set[str]:
+    """Which worded sentences the firm reads, taken from the code that reads them.
+
+    Six desks judge from a rule the corpus states in words rather than a figure, and those rules
+    are calibrations too: one that no scenario reaches is a rule this firm has never proved it
+    applies. The names are matched against what the corpus calibrated, so a string the source
+    mentions for some other reason cannot join the roster on its own.
+    """
+    source = inspect.getsource(agents)
+    named = set(re.findall(r'"([a-z_]+)"', source))
+    return {name for name in p.provisions if name in named}
 
 
 def every_threshold_the_firm_enforces_is_exercised(run: Run) -> list[Check]:
     """A derived number no scenario quotes is a number this firm has never proved it applies."""
     p, _firm, walked = review(run_priors(run))
     reached: set[str] = set()
+    quoted: set[str] = set()
     for _case, findings in walked:
         for finding in findings:
             reached.update(stated_names(p, finding))
+            quote = str(finding.cite.get("quote", ""))
+            if quote:
+                quoted.add(quote[:300])
     wanted = enforced_thresholds()
-    run.rules |= reached & wanted
+    read = enforced_provisions(p)
+    # A sentence the corpus stopped stating is the last check's business, not this one's: the desk
+    # that answers "the text says nothing here" has exercised its rule exactly as written.
+    worded = {name for name in read if p.provision(name)}
+    stated = {name for name in worded
+              if str((p.provision(name) or {}).get("quote", ""))[:300] in quoted}
+    run.rules |= (reached & wanted) | stated
     return [
         Check("every enforced threshold is stated by some finding", sorted(wanted - reached), []),
-        Check("the sweep is what reaches them", True, len(reached) >= len(wanted)),
+        Check("every enforced sentence is quoted by some finding", sorted(worded - stated), []),
+        Check("the sweep is what reaches them", True,
+              len(reached) >= len(wanted) and stated == worded),
         Check("and the corpus really did calibrate them", [],
-              [name for name in wanted if p.value(name) is None]),
+              [name for name in wanted if p.value(name) is None]
+              + [name for name in read if not p.provision(name)]),
     ]
 
 

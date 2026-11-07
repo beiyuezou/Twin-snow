@@ -52,6 +52,27 @@ class Rule:
 
 
 @dataclass(frozen=True)
+class Provision:
+    """A rule the corpus states in words and not in a number, found the same way.
+
+    The rotation ceiling and the four-month deadline come out of `Rule` because they are figures.
+    "Fees for the provision of statutory audits to public-interest entities shall not be contingent
+    fees" is not: there is nothing to measure, and yet the firm still has to be able to say which
+    sentence in which article it is refusing the fee arrangement under. A provision is that
+    sentence, selected by the words around it and stored with its reference, so a role that enforces
+    a rule with no number in it cites the text the way one with a number does.
+    """
+
+    name: str
+    keywords: tuple[str, ...]
+    within: int = 420
+
+    def matches(self, sentence: str) -> bool:
+        low = sentence.lower()
+        return all(k in low for k in self.keywords)
+
+
+@dataclass(frozen=True)
 class Prior:
     name: str
     value: float | None
@@ -126,10 +147,46 @@ RULES: tuple[Rule, ...] = (
          note="The floor on how long the register the KYC agent checks against keeps its data. "
               "The sentence gives a band - 'at least five years and no more than 10' - and the floor "
               "is the number an agent can rely on."),
+    Rule("non_audit_lookback_years", ("provides", "non-audit services", "consecutive financial years"),
+         "duration_financial_years",
+         note="How many consecutive financial years of non-audit work bring Article 4(2)'s ceiling "
+              "into play - and the number of years whose audit fees that ceiling is averaged over. "
+              "The same sentence states both, so one prior carries both duties, and the role that uses "
+              "it says which of the two it is applying."),
+    Rule("transparency_report_deadline_months", ("transparency report",), "duration_months",
+         note="How long after the end of the financial year a firm auditing public-interest entities "
+              "has to publish its annual transparency report. The only span in months in that article, "
+              "which is why the measure does the filtering rather than a keyword."),
+    Rule("transparency_report_available_years", ("transparency report", "available"), "duration_years",
+         pick="min",
+         note="How long that report has to stay on the website once published. 'at least' again marks "
+              "the number an agent may rely on, and the sentence is the only one in Article 13 that "
+              "carries both words."),
     # Materiality is an auditor's judgement under an auditing standard, not a figure in EU
     # law. It is listed so the run proves the absence rather than hiding it.
     Rule("materiality_percent_of_turnover", ("materiality",), "percent",
          note="No EU statute in the corpus states a materiality percentage."),
+)
+
+# What the firm enforces that has no figure in it. Same corpus, same provenance, one sentence each.
+PROVISIONS: tuple[Provision, ...] = (
+    Provision("contingent_audit_fees", ("contingent fees", "statutory audits to public-interest entities")),
+    # The Directive's own fee article says "cannot be based on any form of contingency", not
+    # "contingent", so it needs its second set of words - and its first limb, that the audit fee be
+    # uninfluenced by the additional services sold to the same client, is why this role exists at all
+    # for a client the Regulation does not reach.
+    Provision("contingent_audit_fees_directive", ("fees for statutory audits", "contingency")),
+    Provision("additional_report_to_committee",
+              ("additional report to the audit committee", "not later than"), within=520),
+    # Read wide for the same reason as the one below: the particulars are lettered (a), (b) and (c),
+    # and an entry cut at 420 characters asks the firm about two of the three.
+    Provision("public_register_particulars", ("public register", "shall contain at least"), within=700),
+    # The clause naming which Article 5(1) points the prohibition repeats sits past the end of a
+    # 420-character window, and a provision cut off before its list is a prohibition with no
+    # contents, so this one is read wider than the rest.
+    Provision("sustainability_service_prohibition",
+              ("assurance of sustainability reporting",
+               "prohibited non-audit services referred to in points"), within=760),
 )
 
 
@@ -350,6 +407,84 @@ def derive_services(statutes: list[dict[str, Any]] | None = None) -> dict[str, A
             "derogation": {"quote": "", "points_text": "", "points": {}}, "approval": ""}
 
 
+RANGE_POINT = re.compile(r"\(([a-z])\)\s+to\s+\(([a-z])\)")
+# A list item's letter stands alone - "(a) name, address..." - while the plural in
+# "registration(s)" is glued to the word it inflects. The lookbehind is what keeps the second kind
+# out of an expanded point list without hard-coding which articles have plurals in them.
+SINGLE_POINT = re.compile(r"(?<![A-Za-z0-9])\(([a-z])\)(?=\s)")
+# The two ways this corpus introduces a list of points: by pointing at one ("referred to in points
+# (b) and (c)"), or by printing it after a colon ("shall contain at least the following
+# information: (a) name, address and registration number").
+CROSS_REFERENCE = "referred to in points"
+POINT_ANCHORS = (CROSS_REFERENCE, "the following information:", "the following details:")
+
+
+def points_clause(sentence: str) -> str:
+    """The lettered part of a provision, or '' when it has none."""
+    low = sentence.lower()
+    for anchor in POINT_ANCHORS:
+        where = low.find(anchor)
+        if where < 0:
+            continue
+        tail = sentence[where + len(anchor):]
+        # A cross-reference ends where the article it borrows from begins; a colon introduces the
+        # list itself, and the list runs to the end of the sentence.
+        stop = tail.lower().find(" of the ") if anchor == CROSS_REFERENCE else -1
+        return tail[:stop] if stop >= 0 else tail
+    return ""
+
+
+def expand_points(clause: str) -> list[str]:
+    """'(b) and (c) and points (e) to (k)' read as the letters it names, smallest first.
+
+    Ranges are taken out before the singles are collected, or '(e) to (k)' would also contribute
+    its two end letters as stand-alone points - which changes nothing here but would matter in a
+    clause that mixed a range with the letter it ends on.
+    """
+    letters: set[str] = set()
+    rest = clause
+    for first, last in RANGE_POINT.findall(rest):
+        if len(first) == len(last) == 1 and first <= last:
+            letters.update(chr(code) for code in range(ord(first), ord(last) + 1))
+        rest = rest.replace(f"({first}) to ({last})", " ")
+    letters.update(letter for letter in SINGLE_POINT.findall(rest) if len(letter) == 1)
+    return sorted(letters)
+
+
+def derive_provisions(statutes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """One quoted sentence per provision, with the article it came from.
+
+    The first match in statute order wins and every later one is counted, because a provision that
+    appears twice is a provision whose wording drifted between the Regulation and the Directive, and
+    a reader should be able to see that from the file rather than from this code.
+    """
+    documents = statutes if statutes is not None else load_statutes()
+    ordered = sorted(documents, key=lambda doc: str(doc.get("celex", "")))
+    out: dict[str, Any] = {}
+    for provision in PROVISIONS:
+        found: dict[str, Any] | None = None
+        hits = 0
+        for document in ordered:
+            for article in document.get("articles", []):
+                for sentence in sentences(article.get("text", "")):
+                    if not provision.matches(sentence):
+                        continue
+                    hits += 1
+                    if found is None:
+                        found = {"celex": str(document.get("celex", "")),
+                                 "article": str(article.get("article", "")),
+                                 "quote": " ".join(sentence.split())[:provision.within]}
+        entry = dict(found or {"celex": "", "article": "", "quote": ""})
+        entry["state"] = "quoted" if found else "not_in_corpus"
+        entry["hits"] = hits
+        clause = points_clause(entry["quote"])
+        if clause:
+            entry["points_text"] = " ".join(clause.split())[:120]
+            entry["points"] = expand_points(clause)
+        out[provision.name] = entry
+    return out
+
+
 def derive(statutes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     statutes = statutes if statutes is not None else load_statutes()
     priors = [find(rule, statutes) for rule in RULES]
@@ -361,6 +496,7 @@ def derive(statutes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         },
         "uncalibrated": [p.name for p in priors if not p.calibrated],
         "priors": {p.name: p.to_dict() for p in priors},
+        "provisions": derive_provisions(statutes),
         "size_bands": derive_bands(statutes),
         "non_audit_services": derive_services(statutes),
     }

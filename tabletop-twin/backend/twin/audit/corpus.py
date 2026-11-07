@@ -237,6 +237,12 @@ PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("duration_years", re.compile(rf"{NUM}\s*(?P<unit>years?)", re.I)),
     ("duration_months", re.compile(rf"{NUM}\s*(?P<unit>months?)", re.I)),
     ("duration_days", re.compile(rf"{NUM}\s*(?P<unit>calendar days?|days?)", re.I)),
+    # "for a period of three or more consecutive financial years" states its number two words away
+    # from the thing it counts, so `duration_years` cannot see it. A separate measure name rather
+    # than a looser `years?` pattern: every prior that reads `duration_years` would otherwise start
+    # matching across words it was never meant to reach.
+    ("duration_financial_years",
+     re.compile(rf"{NUM}\s+(?:or more\s+)?(?:[\w-]+\s+){{0,3}}?financial years", re.I)),
     ("percent", re.compile(rf"{NUM}\s*(?:%|per\s*cent|percent)", re.I)),
     ("amount_eur", re.compile(r"(?P<unit>EUR|euros?)\s*(?P<value>\d{1,4}(?:[. ]\d{3})*(?:[.,]\d+)?)", re.I)),
     ("count", re.compile(rf"{NUM}\s*(?P<unit>members?|auditors?|firms?|committees?|employees?|persons?)\b", re.I)),

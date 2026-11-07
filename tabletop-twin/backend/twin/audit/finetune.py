@@ -6,7 +6,7 @@ purpose - `TWIN_FINE_TUNE_BASE`, `TWIN_FINE_TUNE_KEY`, `TWIN_FINE_TUNE_MODEL` - 
 with `--yes`. This repository has never completed a training run, and the sidecar says so in
 `trained_here` rather than letting a reader infer it from the files' existence.
 
-What the corpus teaches is deliberately narrow. The twelve agents already decide from derived
+What the corpus teaches is deliberately narrow. The eighteen agents already decide from derived
 citations, and the only thing a model is asked for in `agents.py` is one sentence of prose about
 figures it was handed. So every row is exactly that call: the case's figures, the verdict the
 rules reached, and the article the verdict came from on one side; the firm's own sentence on the
@@ -134,45 +134,76 @@ def sweep(priors: Priors) -> tuple[Case, ...]:
                 balance_sheet_eur=sheet / 2.0, employees=heads / 2.0,
                 partner_years=max(partner - 1, 0), years_since_previous=max(cooling, 1),
                 non_audit_fee_cents=at_cap // 2, firm_fee_from_client_cents=at_dependence // 2,
-                kyc_checked_years_ago=max(retention - 1, 0), file_retention_years=retention)
+                kyc_checked_years_ago=max(retention - 1, 0), file_retention_years=retention,
+                # The six later desks ask about the firm's own conduct rather than the client's
+                # accounts, so the standing facts are the boring ones: a fee agreed in advance, one
+                # year of non-audit work, the report published and the register entry complete. Each
+                # case that is interesting on one of those six says so by moving it.
+                fee_arrangement="fixed in advance", non_audit_years=1,
+                months_since_year_end=2, transparency_published=True, transparency_kept_years=6,
+                audit_report_issued=True, committee_report_issued=True,
+                register_status="registered", register_particulars=("a", "b", "c"))
+    three = (AUDIT_FEE_CENTS,) * 3
     return (
         Case(client="Nordwind Textil AG", **{**base, "years_auditing": initial}),
         Case(client="Nordwind Textil AG", **{**base, "years_auditing": tendered + 1,
-                                             "tender_held": True}),
+                                             "tender_held": True,
+                                             "register_particulars": ("a", "c"),
+                                             "audit_report_issued": False,
+                                             "committee_report_issued": False}),
         Case(client="Nordwind Textil AG", **{**base, "years_auditing": outer + 1,
-                                             "tender_held": True}),
+                                             "tender_held": True, "non_audit_years": 3,
+                                             "prior_audit_fees_cents": three,
+                                             "prior_non_audit_fees_cents": (at_cap // 2,) * 3}),
         Case(client="Halbe Druckerei GmbH", **{**base, "is_pie": False, "years_auditing": initial,
                                                "previously_audited": True,
                                                "years_since_previous": max(comeback - 1, 0)}),
         Case(client="Vantage Logistics NV", **{**base, "years_auditing": max(initial - 1, 0),
                                                "previously_audited": True,
-                                               "years_since_previous": max(cooling - 1, 0)}),
+                                               "years_since_previous": max(cooling - 1, 0),
+                                               "fee_arrangement": "contingent on the outcome of the"
+                                                                  " transaction"}),
         Case(client="Sable Health Holdings SA", **{**base, "years_auditing": max(initial - 2, 0),
-                                                   "non_audit_fee_cents": at_cap}),
+                                                   "non_audit_fee_cents": at_cap,
+                                                   "register_status": ""}),
         Case(client="Sable Health Holdings SA", **{**base, "years_auditing": max(initial - 2, 0),
-                                                   "non_audit_fee_cents": at_cap + 1}),
+                                                   "non_audit_fee_cents": at_cap + 1,
+                                                   "committee_report_issued": False}),
         Case(client="Sable Health Holdings SA", **{**base, "years_auditing": max(initial - 2, 0),
-                                                   "firm_fee_from_client_cents": at_dependence + 1}),
+                                                   "firm_fee_from_client_cents": at_dependence + 1,
+                                                   "sustainability_assurance": True}),
         Case(client="Meridian Utilities PLC", **{**base, "years_auditing": max(initial - 2, 0),
                                                  "is_group": True,
                                                  "parent_holding_percent": presumed,
                                                  "turnover_eur": turnover * 2.0,
                                                  "balance_sheet_eur": sheet * 2.0,
-                                                 "employees": heads * 2.0}),
+                                                 "employees": heads * 2.0, "non_audit_years": 4,
+                                                 "prior_audit_fees_cents": three,
+                                                 "prior_non_audit_fees_cents": (at_cap + 1,) * 3}),
         Case(client="Meridian Utilities PLC", **{**base, "years_auditing": max(initial - 2, 0),
                                                  "is_group": True,
-                                                 "parent_holding_percent": presumed / 2.0}),
+                                                 "parent_holding_percent": presumed / 2.0,
+                                                 "non_audit_years": 3,
+                                                 "prior_audit_fees_cents": (AUDIT_FEE_CENTS,),
+                                                 "prior_non_audit_fees_cents": (at_cap,)}),
         Case(client="Kestrel Foods BV", **{**base, "years_auditing": max(initial - 2, 0),
                                            "non_audit_services": (booked,) if booked else (),
-                                           "non_audit_fee_cents": at_cap // 2}),
+                                           "non_audit_fee_cents": at_cap // 2,
+                                           "sustainability_assurance": True}),
         Case(client="Kestrel Foods BV", **{**base, "years_auditing": max(initial - 2, 0),
-                                           "non_audit_services": (thin,) if thin else ()}),
+                                           "non_audit_services": (thin,) if thin else (),
+                                           "sustainability_assurance": True,
+                                           "fee_arrangement": ""}),
         Case(client="Aldermen Property Trust", **{**base, "years_auditing": max(initial - 2, 0),
                                                   "kyc_checked_years_ago": retention + 1,
-                                                  "file_retention_years": max(retention - 1, 0)}),
+                                                  "file_retention_years": max(retention - 1, 0),
+                                                  "months_since_year_end": 6,
+                                                  "transparency_published": False}),
         Case(client="Aldermen Property Trust", **{**base, "years_auditing": max(initial - 2, 0),
                                                   "kyc_checked_years_ago": max(retention - 1, 0),
-                                                  "file_retention_years": retention}),
+                                                  "file_retention_years": retention,
+                                                  "transparency_kept_years": 0,
+                                                  "register_status": "lapsed"}),
     )
 
 

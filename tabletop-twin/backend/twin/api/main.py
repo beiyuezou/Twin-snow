@@ -157,7 +157,7 @@ async def lifespan(_app: FastAPI):
     """Background reconciliation is opt-in: it needs a transport that can answer a lookup.
 
     The audit firm is opened the same way. A sidecar named by `TWIN_CHAIN_URL` is probed once
-    here and the twelve roles are put on it, so the first review of the day writes agreements
+    here and every role of the firm is put on it, so the first review writes agreements
     instead of racing a registration. No url, or no answer, costs one short timeout at boot and
     is then said by every endpoint that needs a chain - because a firm that cannot reach its
     contract still has an opinion, and hiding that is worse than reporting it.
@@ -274,6 +274,12 @@ class RailIn(BaseModel):
     rail: str = Field(min_length=1, max_length=32)
 
 
+# The engagement fields the firm's own case type declares as tuples, so a posted list has to
+# become one before the frozen dataclass is built.
+TUPLE_FIELDS = ("non_audit_services", "prior_audit_fees_cents", "prior_non_audit_fees_cents",
+                "register_particulars")
+
+
 class EngagementIn(BaseModel):
     """One engagement to put in front of the firm: an index into the derived cases, plus the
     figures this client's file says differently.
@@ -303,14 +309,30 @@ class EngagementIn(BaseModel):
     tender_held: bool | None = None
     kyc_checked_years_ago: int | None = Field(default=None, ge=0, le=99)
     file_retention_years: int | None = Field(default=None, ge=0, le=99)
+    fee_arrangement: Annotated[str, Field(min_length=1, max_length=120)] | None = None
+    non_audit_years: int | None = Field(default=None, ge=0, le=99)
+    prior_audit_fees_cents: list[Annotated[int, Field(ge=0, le=100_000_000_000)]] | None = Field(
+        default=None, max_length=8)
+    prior_non_audit_fees_cents: list[Annotated[int, Field(ge=0, le=100_000_000_000)]] | None = Field(
+        default=None, max_length=8)
+    months_since_year_end: int | None = Field(default=None, ge=0, le=24)
+    transparency_published: bool | None = None
+    transparency_kept_years: int | None = Field(default=None, ge=0, le=99)
+    audit_report_issued: bool | None = None
+    committee_report_issued: bool | None = None
+    register_status: Annotated[str, Field(min_length=1, max_length=60)] | None = None
+    register_particulars: list[Annotated[str, Field(min_length=1, max_length=4)]] | None = Field(
+        default=None, max_length=8)
+    sustainability_assurance: bool | None = None
 
     def changes(self) -> dict:
         """Only the figures somebody actually sent, so an untouched one stays the derived one."""
         changes = self.model_dump(exclude_unset=True, exclude={"engagement"})
         # JSON has no tuple. Left as a list it would sit in a field the engagement declares as
         # one, and a frozen dataclass holding a list cannot be hashed.
-        if "non_audit_services" in changes:
-            changes["non_audit_services"] = tuple(changes["non_audit_services"] or ())
+        for name in TUPLE_FIELDS:
+            if name in changes:
+                changes[name] = tuple(changes[name] or ())
         return changes
 
 
@@ -823,7 +845,7 @@ def firm_engagements() -> dict:
 @app.post("/v1/firm/review")
 def firm_review(body: EngagementIn, user_id: str = Depends(current_user),
                 s: Session = Depends(world_of)) -> dict:
-    """Twelve agents answer one engagement, and what they bind each other to is written down."""
+    """Every agent answers one engagement, and what they bind each other to is written down."""
     cases = firm_service.engagements()
     if body.engagement >= len(cases):
         raise HTTPException(status_code=422,

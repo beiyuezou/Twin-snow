@@ -247,6 +247,20 @@
    "unit": "percent",
    "value": 70.0
   },
+  "non_audit_lookback_years": {
+   "article": "4",
+   "celex": "32014R0537",
+   "distinct": [
+    3.0
+   ],
+   "hits": 2,
+   "name": "non_audit_lookback_years",
+   "note": "How many consecutive financial years of non-audit work bring Article 4(2)'s ceiling into play - and the number of years whose audit fees that ceiling is averaged over. The same sentence states both, so one prior carries both duties, and the role that uses it says which of the two it is applying.",
+   "quote": " entity, its parent undertaking or its controlled undertakings, for a period of three or more consecutive financial years, non-audit services other than those referred to in Article 5(1) of this Regulation, the total fees for such services shall be limited to no more than 70 % of the average of the fees paid in the las",
+   "state": "calibrated",
+   "unit": "duration_financial_years",
+   "value": 3.0
+  },
   "participation_presumed_percent": {
    "article": "2",
    "celex": "32013L0034",
@@ -362,6 +376,90 @@
    "state": "calibrated",
    "unit": "amount_eur",
    "value": 12000000.0
+  },
+  "transparency_report_available_years": {
+   "article": "13",
+   "celex": "32014R0537",
+   "distinct": [
+    5.0
+   ],
+   "hits": 1,
+   "name": "transparency_report_available_years",
+   "note": "How long that report has to stay on the website once published. 'at least' again marks the number an agent may rely on, and the sentence is the only one in Article 13 that carries both words.",
+   "quote": "That transparency report shall be published on the website of the statutory auditor or the audit firm and shall remain available on that website for at least five years from the day of its publication on the website.",
+   "state": "calibrated",
+   "unit": "duration_years",
+   "value": 5.0
+  },
+  "transparency_report_deadline_months": {
+   "article": "13",
+   "celex": "32014R0537",
+   "distinct": [
+    3.0,
+    4.0
+   ],
+   "hits": 2,
+   "name": "transparency_report_deadline_months",
+   "note": "How long after the end of the financial year a firm auditing public-interest entities has to publish its annual transparency report. The only span in months in that article, which is why the measure does the filtering rather than a keyword.",
+   "quote": "A statutory auditor or an audit firm that carries out statutory audits of public-interest entities shall make public an annual transparency report at the latest four months after the end of each financial year.",
+   "state": "calibrated",
+   "unit": "duration_months",
+   "value": 4.0
+  }
+ },
+ "provisions": {
+  "additional_report_to_committee": {
+   "article": "11",
+   "celex": "32014R0537",
+   "hits": 1,
+   "quote": "Statutory auditors or audit firms carrying out statutory audits of public-interest entities shall submit an additional report to the audit committee of the audited entity not later than the date of submission of the audit report referred to in Article 10.",
+   "state": "quoted"
+  },
+  "contingent_audit_fees": {
+   "article": "4",
+   "celex": "32014R0537",
+   "hits": 1,
+   "quote": "Fees for the provision of statutory audits to public-interest entities shall not be contingent fees.",
+   "state": "quoted"
+  },
+  "contingent_audit_fees_directive": {
+   "article": "25",
+   "celex": "32006L0043",
+   "hits": 2,
+   "quote": "Article 25 Audit fees Member States shall ensure that adequate rules are in place which provide that fees for statutory audits: (a) are not influenced or determined by the provision of additional services to the audited entity; (b) cannot be based on any form of contingency.",
+   "state": "quoted"
+  },
+  "public_register_particulars": {
+   "article": "16",
+   "celex": "32006L0043",
+   "hits": 3,
+   "points": [
+    "a",
+    "b",
+    "c"
+   ],
+   "points_text": "(a) name, address and registration number; (b) if applicable, the name, address, website address and registration number",
+   "quote": "As regards statutory auditors, the public register shall contain at least the following information: (a) name, address and registration number; (b) if applicable, the name, address, website address and registration number of the audit firm(s) by which the statutory auditor is employed, or with whom he or she is associated as a partner or otherwise; (c) all other registration(s) as statutory auditor with the competent authorities of other Member States and as auditor with third countries, including the name(s) of the registration authority(ies), and, if applicable, the registration number(s).",
+   "state": "quoted"
+  },
+  "sustainability_service_prohibition": {
+   "article": "25c",
+   "celex": "32022L2464",
+   "hits": 1,
+   "points": [
+    "b",
+    "c",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k"
+   ],
+   "points_text": "(b) and (c) and points (e) to (k)",
+   "quote": "A statutory auditor or an audit firm carrying out the assurance of sustainability reporting of a public-interest entity, or any member of the network to which the statutory auditor or the audit firm belongs, shall not directly or indirectly provide to the public-interest entity that is the subject of the assurance of sustainability reporting, to its parent undertaking or to its controlled undertakings within the Union the prohibited non-audit services referred to in points (b) and (c) and points (e) to (k) of the second subparagraph of Article 5(1) of Regulation (EU) No 537/2014 in: (a) the period between the beginning of the period subject to the assurance of sustainability reporting and the issuing of the assurance report on sustainability reportin",
+   "state": "quoted"
   }
  },
  "size_bands": {

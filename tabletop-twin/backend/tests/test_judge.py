@@ -177,21 +177,22 @@ def test_a_filed_citation_carries_the_digest_of_the_article_it_quotes(p, index, 
 def test_one_review_can_carry_two_authors(p, index, muse):
     """The route belongs to a judgement, not to an engagement.
 
-    A review in which all twelve answer the same way cannot tell apart a card that counts
+    A review in which every desk answers the same way cannot tell apart a card that counts
     them separately from one that prints a single route for the whole ask.
     """
     made = judge_for(muse, index)
+    refused_at = [position for position in range(len(ROLES)) if position % 3 == 0]
     for position, role in enumerate(ROLES):
         stage = stage_for(made, p, role)
         args = judgement(stage.entry, stage.quote, asks_of_role="")
-        if position % 3 == 0:
+        if position in refused_at:
             args["quote"] = "a sentence this harvest never printed"
         muse.responses_tool((TOOL, args))
     findings = Firm(p, judge=made).review(engagement())
     refused = [finding for finding in findings if "muse refused" in finding.route]
     decided = [finding for finding in findings if finding.route == made.config.route]
     assert muse.calls == len(ROLES)
-    assert len(refused) == 4 and len(decided) == len(ROLES) - 4
+    assert len(refused) == len(refused_at) and len(decided) == len(ROLES) - len(refused_at)
     assert all(str(finding.numbers["muse_refused"]) for finding in refused)
     assert all("muse_refused" not in finding.numbers for finding in decided)
 

@@ -155,12 +155,13 @@ class Judge:
         """The six passages this judgement will be checked against.
 
         The query is the role and its question, and the figures are deliberately left out of it. They
-        were in here once, and measured: with the fact keys and values appended, all twelve questions
-        returned the same three articles - the definitions, the audit-fee article, the ones that use
-        the word "audit" - because a client's file is written in the same vocabulary as the statute
-        that governs it. A retriever that answers every question with the articles everybody mentions
-        is not retrieving, and the figures belong in the FACTS block, where the model reads them as
-        facts rather than as search terms.
+        were in here once, and measured over all eighteen desks: with the fact keys and values appended,
+        the eighteen questions answered with only eleven distinct articles between them, and three of
+        those - the Accounting Directive's size definitions, the Audit Regulation's transparency report,
+        the CSRD's scope - came back in all eighteen sets. A client's file is written in the same
+        vocabulary as the statute that governs it, so a retriever that answers every question with the
+        articles everybody mentions is not retrieving. The figures belong in the FACTS block, where the
+        model reads them as facts rather than as search terms.
         """
         return self.index.passages(f"{role.replace('-', ' ')} {question}", PASSAGES, PASSAGE_CHARS)
 
@@ -243,7 +244,7 @@ class Judge:
         if self.index.state != "checked":
             # Hashes alone cannot check a quote, and a route that says "muse decided" when nothing
             # could have been checked is the one lie this design cannot tell. So the asking never
-            # starts, and twelve requests are not spent on answers that would all be thrown away.
+            # starts, and the requests are not spent on answers that would all be thrown away.
             self.last_route = ("rules (the harvested text is not on this machine, so no quote could"
                                " have been checked)")
             return None
