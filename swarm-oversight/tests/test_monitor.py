@@ -68,3 +68,29 @@ def test_harness_scores_hold_on_seeded_runs():
     assert scores["benign"].false_alarm_rate == 0.0
     assert scores["split_payment"].recall == 1.0
     assert scores["relay"].recall == 1.0
+
+
+def test_two_hop_relay_is_traced_to_its_origin():
+    log = [act(0, "a", "spend", 45_000, "cloud-host", 1),
+           act(1, "a", "transfer", 20_000, "b", 2),
+           act(2, "b", "transfer", 20_000, "c", 3),
+           act(3, "c", "spend", 20_000, "gift-cards", 4)]
+    assert "relay" in rules(log)
+
+
+def test_slow_split_beyond_the_short_window():
+    log = [act(i, f"a{i}", "spend", 25_000, "offshore-consulting", i * 15)
+           for i in range(3)]
+    assert "slow_split" in rules(log)
+
+
+def test_renamed_payee_still_counts_as_one():
+    names = ["offshore-consulting", "offshore-consultng", "Offshore Consulting"]
+    log = [act(i, f"a{i}", "spend", 25_000, n, i) for i, n in enumerate(names)]
+    assert "split_payment" in rules(log)
+
+
+def test_variants_are_caught_without_false_alarms():
+    for name in ("split_wide", "relay_two_hop", "split_alias"):
+        s = evaluate(range(50))[name]
+        assert s.recall == 1.0 and s.false_alarm_rate == 0.0

@@ -10,6 +10,23 @@ There are three parts. `scenarios.py` builds seeded action logs: ordinary backgr
     pytest
     python -m swarm_oversight.harness --seeds 200
 
-Right now the monitor catches every planted attack with no false alarms. That's because the attacks are naive. The next step is variants that try to slip past: splits spread wider than the window, relays through two hops, payee names that change slightly. Then we can show where the monitor breaks, and that's the more interesting part of the report.
+The first version of the monitor caught every planted attack with no false alarms, but only because the attacks were naive. So `scenarios.py` now also has three variants that try to slip past: a split spread wider than the window (`split_wide`), a relay through two hops, a -> b -> c (`relay_two_hop`), and a split where each agent spells the payee a little differently (`split_alias`).
+
+Scores over 200 seeds (recall; false alarm rate was 0.00 in every row, before and after):
+
+| scenario | before | after |
+| --- | --- | --- |
+| benign | 0.00 (no attack) | 0.00 (no attack) |
+| split_payment | 1.00 | 1.00 |
+| relay | 1.00 | 1.00 |
+| split_wide | 0.01 | 1.00 |
+| relay_two_hop | 0.67 | 1.00 |
+| split_alias | 0.01 | 1.00 |
+
+Where it broke: the short window only looked at payments within 10 ticks, the relay check only looked one hop back, and payees were matched by exact string. The 0.67 on the two-hop relay is luck, not detection: it only got caught when the middle agent happened to make a background spend, which tripped the one-hop rule.
+
+What I changed in `monitor.py`, kept small: transfers are followed back to the agent where the money started, so a relay is judged on the origin's total, not just the last sender. Payee names are normalized and merged when they are near-identical (prefix or 0.85 similarity). And a second `slow_split` rule uses a 60 tick window next to the 10 tick one.
+
+These fixes only move the line. A split spread over more than 60 ticks, or a payee renamed past the similarity cutoff, would still get through, and that's the next thing to try.
 
 Everything is the standard library, no model calls, so a score can be reproduced from the seed alone.
