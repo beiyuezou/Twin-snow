@@ -30,7 +30,7 @@ class TwinController {
   /** False while the route is only what the environment says it would be. */
   routeMeasured = true;
   account = '';
-  /** What the firm says it is: twelve roles, the figures they quote, and what they stand on. */
+  /** What the firm says it is: every role, the figures they quote, and what they stand on. */
   firm: FirmBrief | null = null;
   /** How the boot probe found the contract, if it reached one. */
   firmHealth: FirmHealth | null = null;
@@ -266,7 +266,7 @@ class TwinController {
   }
 
   /**
-   * Put the next engagement to the twelve agents and write down what they bind
+   * Put the next engagement to the firm and write down what the agents bind
    * each other to.
    *
    * The rotation moves only when the review answered. An index that advanced past a

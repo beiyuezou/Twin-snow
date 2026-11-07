@@ -202,10 +202,10 @@ export class TwinFirmSystem extends createSystem({
   }
 
   /**
-   * How the twelve answers divide between the model and the rules, counted from each
+   * How the answers divide between the model and the rules, counted from each
    * finding's own route rather than from one route for the engagement - one ask can be
    * refused and the next accepted, and a card that said "muse" over both would be
-   * reporting the last request rather than the twelve answers.
+   * reporting the last request rather than the eighteen answers.
    */
   private who(review: FirmReview | null): string {
     if (!review) return '';
