@@ -1,0 +1,12 @@
+[project]
+name = "swarm-oversight"
+version = "0.1.0"
+description = "Seeded multi-agent spending logs and a swarm-level monitor to score against them"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
