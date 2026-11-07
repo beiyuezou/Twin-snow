@@ -157,18 +157,24 @@ why the money panel can state the twin's week without being asked.
 ## The firm beside the table
 
 The twin answers questions about its own cash. A second miniature on the same service
-answers questions about somebody else's: twelve audit roles that rule on European
+answers questions about somebody else's: eighteen audit roles that rule on European
 company-audit and financial-statement rules, and a card on the table that says what they
 decided. It is the same world, the same accounts, the same ledger and the same rule that a
 figure nobody computed may not be spoken.
 
 Three things keep it honest, and they are the reason it lives here rather than beside it:
 
-- **Its thresholds are read out of the law, not remembered.** Fourteen of the fifteen
+- **Its thresholds are read out of the law, not remembered.** Seventeen of the eighteen
   figures the firm quotes were derived from 299 articles across 8 statutes fetched from
-  open EU sources, each with the article attached. The fifteenth — materiality as a share
+  open EU sources, each with the article attached. One of them — materiality as a share
   of turnover — is left uncalibrated because no article states it, and a blank that says so
-  is better than a plausible number.
+  is better than a plausible number. Six of the eighteen desks go past the figures this
+  pass had already derived: four answer from sentences the harvest states in words and no
+  number at all — how a fee may be agreed, what the public register has to hold about the
+  firm, which services a firm assuring sustainability reporting may not also sell — and two
+  do arithmetic on figures the corpus only gave up under a second reading. All six are
+  derived the same way, with the sentence kept verbatim and its lettered lists read out of
+  it rather than copied here.
 - **The agreement is kept somewhere other than in this program's memory.** The roles are
   registered on a Solidity engagement contract on a local EVM sidecar, and the bytecode is
   a second authority that sometimes disagrees: an engagement one basis point past the fee
@@ -185,7 +191,7 @@ allowed to claim. Where the twin only lets a model choose and explain, the firm 
 and lets the model decide: given a key, each role's verdict comes from the endpoint, and the
 service files it only after checking it against the text of the law it claims to quote - and
 when the check refuses, the rule answers instead and the card says which of the two spoke.
-With no key, which is how this machine runs, all twelve answers come from the same rule
+With no key, which is how this machine runs, all eighteen answers come from the same rule
 planner as the twin, and say so.
 
 ## Accessibility
@@ -214,7 +220,7 @@ The firm beside the table is a second domain, added on purpose: European audit a
 financial-statement rules, put to fourteen fictional engagements, answering only with
 figures the harvest produced. It does not audit the twin's cash and the twin does not speak
 for it; each has its own card. No real firm, real company or real statutory auditor is
-modelled by any of the twelve roles, and none of this is advice to anybody with a filing
+modelled by any of the eighteen roles, and none of this is advice to anybody with a filing
 deadline.
 
 ## Running it
@@ -289,9 +295,9 @@ from then on.
 
 ## Verification status
 
-The service is covered by 426 tests that run the forecast, the forks, the policy
+The service is covered by 432 tests that run the forecast, the forks, the policy
 engine, the guardrails in front of it, the payment state machine, the settlement catalog,
-the accounts, the world a device opens for itself, the audit trail, the twelve roles, the
+the accounts, the world a device opens for itself, the audit trail, the eighteen roles, the
 law they cite and the checks that decide whether a citation is good enough to file, the
 contract they write to, the real PayPal transport and the Muse route —
 each of the last two against a gateway that answers on a socket, so a refused credential,
@@ -306,7 +312,8 @@ to check that there is something to guard. No test ever holds a real credential:
 environment is emptied around every one of them, and a test that wants an endpoint stands
 it up itself. The whole suite runs against a real PostgreSQL server, one schema per test,
 and the run above was measured against a server started from the packaged binaries on this
-machine: 426 passed in 337.11 seconds. It was 388 in 212.22 seconds before the law was
+machine: 432 passed in 184.98 seconds. It was 426 in 337.11 seconds before the
+six desks that read sentences were added, 388 in 212.22 seconds before the law was
 indexed and the judgements put to a gateway, 328 in 91.14 seconds before the socket
 gateways, and 287 in 41 seconds against the file the database replaced — the growth is part
 more tests and part a socket instead of a memory-mapped file. It is bought back the first
@@ -454,44 +461,51 @@ separator and the two spoken sentences that leaned on an em dash are plain ASCII
 is the rule this project already states and had not followed everywhere; the run above is
 the one that shows the boxes gone, not the one that found them.
 
-The firm's card was driven the same way, and this time the managed runtime answered for it:
-the scene rendered valid with the new panel in its visible set, and the live element text
-and component values were read out of the running app rather than out of a preview. With the
-service up and no chain anywhere near it, the card read *no contract*, "12 roles named, none
-hired - no contract was reached", and gave the reason the service gave, naming the variable
-that was not set. A controller was aimed at the card's button and its trigger pressed, and
-the card then carried what the twelve roles actually returned for the first engagement:
-"clear 9 - hold 2 - breach 0 - silent 1", the binding finding with the article it cites, and
-"the words above came from the rules route", which is true because no key was ever supplied.
+The firm's card was driven again in the managed runtime for the eighteen-role roster, and the
+live element text and component values were read out of the running app rather than out of a
+preview. With the service up and no chain anywhere near it, the card read *no contract*, "18
+roles named, none hired - no contract was reached", "17 of 18 figures derived out of 299
+articles in 8 statutes - 1 left uncalibrated", and the reason the service gave, naming the
+variable that was not set. A controller was aimed at the card's button and its trigger pressed,
+and the card then carried what eighteen roles actually returned for the first engagement:
+"clear 14 - hold 2 - breach 0 - silent 2", the binding finding with the article it cites
+("engagement-partner (rules): 10 of at most 20 years on a tender, 10 without one
+(32014R0537 art 17)."), and "the words above came from the rules route", which is true because
+no key was ever supplied.
 
-The sidecar was started and the service restarted with `TWIN_CHAIN_URL` pointing at it. No
-code changed and no page was rebuilt, and the same card moved to *on contract* with "12 of 12
-roles hired". Pressing the button again opened four agreements on the contract with four
-waiting on a signature, and once more advanced the engagement to 2 of 14 while the waiting
-count rose to eight — cumulative counts off the chain, not a client keeping its own tally.
-Every string the card prints was then scanned across all fourteen engagements: the only
-non-ASCII character in any response is inside the quoted article text, which the card does
-not display, so nothing reaches the atlas gap the money panel's separator fell into.
+The sidecar was started and the service restarted with `TWIN_CHAIN_URL` pointing at it, and the
+page reloaded onto it: the same card moved to *on contract* with "18 of 18 roles hired". One
+press opened four agreements on the contract with four waiting on a signature — the four
+findings that bind somebody on that engagement, and nothing else — and a second press advanced
+the engagement to 2 of 14 with "clear 11 - hold 5 - breach 0 - silent 2", six agreements and ten
+waiting, the chain itself answering 18 roles and 10 agreements. Those are cumulative counts read
+off the chain, not a client keeping its own tally. Every string in all 252 findings the fourteen
+engagements return was then scanned: no sentence and no other text field a card prints holds a
+non-ASCII character, and the only non-ASCII bytes anywhere in a response are inside the quoted
+article text, which the card does not display, so nothing reaches the atlas gap the money panel's
+separator fell into.
 
-The twelve answers are no longer written by this program. Each role's verdict, its sentence,
+The eighteen answers are no longer written by this program. Each role's verdict, its sentence,
 the article it stands on and the colleague it asks to act now come from the endpoint when one
 is configured, and the service files an answer only after checking it against the text it
 claims to quote: the 299 articles are indexed by id and by the digest of their own bytes, so a
 citation resolves to a stored article and a quote is matched against the characters that were
 sent, not against a memory of a regulation. Everything said above about what happens then was
-run against the localhost stand-in and never against a paid endpoint. A review of twelve roles
-asked over a socket files twelve judgements carrying the model's verdict rather than the rule's;
+run against the localhost stand-in and never against a paid endpoint. A review of eighteen roles
+asked over a socket files eighteen judgements carrying the model's verdict rather than the rule's;
 the same review with one thing bent at a time - a quote the harvest never
 printed, a figure belonging to nobody, a reference that fights its own passage id, a role
 asking itself to act, a sentence reaching past the window that was sent - returns the rule's
-words instead, with the refusing check named in the route. One of those runs has eight accepted
-and four refused, because a route that belongs to a judgement rather than to an engagement is
+words instead, with the refusing check named in the route. One of those runs has twelve accepted
+and six refused, because a route that belongs to a judgement rather than to an engagement is
 worth nothing unless a review can carry two authors at once - which is what the card's byline,
-and the count under it, now read off each finding. That last piece is client code the build and
-typecheck cover; the panel's live text was read out of the running app before the byline
-existed, and what the browser has not re-read since is the words around it, not the figures.
+and the count under it, now read off each finding. The byline quoted above is live panel text,
+read out of the running app in the state this machine can reach: every finding's own, and every
+one of them rules, because no key was set. What no panel has been watched showing is the mixed
+review itself - twelve model answers and six refusals at one table - because that state is only
+produced by the test that bends six of the eighteen, and it is counted there.
 The command that puts one engagement to a real endpoint exits non-zero when no key is set, so a
-run that quietly printed twelve rules answers cannot be mistaken for a run that asked a model.
+run that quietly printed eighteen rules answers cannot be mistaken for a run that asked a model.
 
 What a browser still cannot do is the headset. The token is picked up by a near grab and
 held there by a squeeze, the wheel turns under a hand, and none of that has been watched

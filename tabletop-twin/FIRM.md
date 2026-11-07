@@ -1,6 +1,6 @@
 # The firm beside the table
 
-A second miniature lives on the same service as the cash twin. Twelve audit roles answer
+A second miniature lives on the same service as the cash twin. Eighteen audit roles answer
 questions about European company-audit and financial-statement rules, and the table draws
 what they decided. It is not a separate product: it shares the accounts, the world a
 device opens for itself, the ledger, the guardrails and the eval command, and it inherits
@@ -8,16 +8,16 @@ the rule that a number nobody computed may not be spoken.
 
 ## Where its numbers come from
 
-The firm quotes fifteen figures — how long a partner may stay on one engagement, how much
+The firm quotes eighteen figures — how long a partner may stay on one engagement, how much
 of a client's fees an audit firm may take before independence is compromised, what a
-related party is, when a group is small enough to be exempt. Fourteen of them were read
+related party is, when a group is small enough to be exempt. Seventeen of them were read
 out of a harvest of the law itself: 299 articles across 8 statutes, fetched from open
 EU sources, with a manifest that records what each document was, how big it came back, and
 which article a figure was taken from. That manifest is what makes a derived figure
 different from a remembered one: the harvest can be re-run and the arithmetic repeated, and
 if the two disagree, the figure is wrong in a findable way.
 
-The fifteenth is left uncalibrated on purpose. Materiality is normally expressed as a
+One of the eighteen is left uncalibrated on purpose. Materiality is normally expressed as a
 percentage of turnover, and nothing in that corpus states the percentage, so the firm
 refuses to quote one it could only have invented. A blank that says "nobody wrote this
 down" is a better answer than a plausible number.
@@ -26,9 +26,22 @@ Every threshold card carries the article it came from and a state — derived, o
 The card is the unit of trust here: a figure with no provenance is not loaded, and a model
 may not move one. That last claim has a guard case, and the case has its negative control.
 
+Not every rule in this harvest is a figure. Four of the eighteen desks answer from a sentence
+that states a rule in words and no number at all: how an audit fee may be calculated, when the
+committee's additional report is owed, what the public register has to hold about the firm, and
+which services a firm that assures sustainability reporting may not sell to the same entity. Two
+more desks do arithmetic, but on figures this harvest only gave up under a second reading: the
+ceiling that averages the non-audit fee over three consecutive financial years, and the
+transparency report that is due four months after the year end and has to stay available for
+five. All six are derived the way the numbers always have been - a phrase selects the article,
+the sentence is kept verbatim, and a lettered list inside it is read out rather than copied, so
+this firm expects three register particulars because the Directive prints three and not because
+a programmer wrote three. A provision the corpus stops stating reads as an absence, and the desk
+built on it goes silent instead of remembering the law.
+
 ## What a review says
 
-Put an engagement to the firm and each of the twelve roles answers once. Every answer is a
+Put an engagement to the firm and each of the eighteen roles answers once. Every answer is a
 verdict, a sentence, and the citation the sentence is standing on. There are four verdicts
 and they are not a sentiment scale: **clear** means the rule was checked and the engagement
 sits inside it, **hold** means the rule binds and something has to happen, **breach** means
@@ -36,10 +49,12 @@ it is already outside the rule, and **silent** means this role has no authority 
 fact — silence is an answer, not a gap in the run.
 
 A finding *binds* only when it names the role that has to act and the verdict is clear or
-hold. On the first engagement of the review corpus that comes out as nine clear, two hold,
-zero breach, one silent, and four findings that bind somebody. The corpus is fourteen
-engagements across seven fictional companies, and the numbers above are what the machine
-returned, not what was expected of it.
+hold. On the first engagement of the review corpus that comes out as fourteen clear, two hold,
+zero breach, two silent, and four findings that bind somebody. Asked over the whole corpus the
+eighteen roles return 252 findings - 163 clear, 45 hold, 14 breach and 30 silent - of which 64
+bind somebody. The corpus is fourteen engagements across seven fictional companies, each one
+placed exactly on, one year past or one cent over a derived boundary, and the numbers above are
+what the machine returned, not what was expected of it.
 
 ## Who decides, and who checks
 
@@ -66,7 +81,10 @@ decides what goes into the ask: none of the figures the firm derived from the ha
 it, neither among the facts the model is handed nor anywhere else, because an answer that
 could copy the right number out of its own prompt has been checked by nothing. Each role's
 question is searched on its own words too - putting the client's file into the search was
-tried, and measured, and it returned the same three articles to all twelve roles.
+tried, and measured over all eighteen desks. Their eighteen questions then answered with only
+eleven distinct articles between them, and three of those came back for every single one: a
+client's file is written in the same vocabulary as the statute that governs it, so a retriever
+handed the figures stops retrieving and starts matching the words everybody uses.
 
 A judgement that fails a check is not filed, and it is not quietly swapped out either. The
 deterministic rule stands in - its verdict, its words, its article - and the route says that

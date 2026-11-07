@@ -162,19 +162,25 @@ recorded as the attempt it was, refused or not.
 
 ## The firm beside the table
 
-A second domain shares this service: twelve audit roles that rule on European
+A second domain shares this service: eighteen audit roles that rule on European
 company-audit and financial-statement rules. They share the accounts, the world a device
 opens for itself, the ledger, the guardrails and the eval command, and they keep the one
 rule the rest of the service keeps — a figure either came out of an arithmetic somebody
 can re-run, or it is not said.
 
-Fifteen thresholds are quoted. Fourteen were derived from a harvest of 299 articles across
+Eighteen thresholds are quoted. Seventeen were derived from a harvest of 299 articles across
 8 statutes, fetched from open EU sources and recorded in a manifest that says what each
-document was and which article a figure was taken from. The fifteenth — materiality as a
+document was and which article a figure was taken from. One of them — materiality as a
 share of turnover — is left uncalibrated, because no article in that corpus states it and a
 plausible invented percentage is the one thing this layer cannot be argued with.
 
-A review puts one engagement to all twelve roles at once. Each returns a verdict, a
+Six of the desks answer from sentences rather than from a figure alone, and five such
+sentences are derived the same way: a phrase selects the article, the sentence is kept
+verbatim, and a lettered list inside it is read out, so the register desk expects the number
+of particulars the Directive prints. A provision the corpus stops stating reads to the firm
+as an absence, and the desk built on it goes silent rather than reciting the law.
+
+A review puts one engagement to all eighteen roles at once. Each returns a verdict, a
 sentence and the citation it is standing on, and the verdicts are four and not a mood
 scale: **clear**, **hold**, **breach**, and **silent** — which is a role saying it has no
 authority over this fact rather than guessing at one. A finding binds only when it names
@@ -285,4 +291,4 @@ Two commands ask the law layer questions without a client or a table. One re-has
 harvest and reports whether the index still matches the articles it was built from. The
 other puts one engagement to a real endpoint and prints, per role, whether the model decided,
 refused or never answered — and it exits non-zero when no key is configured, because a run
-that quietly printed twelve rules answers would look exactly like a run that asked a model.
+that quietly printed eighteen rules answers would look exactly like a run that asked a model.
