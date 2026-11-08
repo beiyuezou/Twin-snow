@@ -17,6 +17,8 @@ import os
 import socket
 import tempfile
 import time
+import urllib.error
+import urllib.request
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,7 +26,7 @@ from fastapi.testclient import TestClient
 from twin.api import main
 from twin.api.main import EngagementIn
 from twin.audit.agents import ROLES, Case, Priors
-from twin.audit.chain import spawn_sidecar
+from twin.audit.chain import ChainDown, spawn_sidecar
 from twin.audit.finetune import sweep
 from twin.store import drop_schema, schema_name
 
@@ -65,6 +67,7 @@ def live(sidecar, monkeypatch):
     name = schema_name()
     monkeypatch.setenv("TWIN_DB_SCHEMA", name)
     monkeypatch.setenv("TWIN_CHAIN_URL", sidecar.url)
+    monkeypatch.setenv("TWIN_CHAIN_TOKEN", sidecar.token)
     main.reset_state()
     try:
         with TestClient(main.app) as running:
@@ -308,13 +311,14 @@ def test_a_review_opens_exactly_the_findings_that_bind(live, live_headers):
     for index in blocked:
         assert _verdict_of(summaries[index], "non-audit-assessor") == "breach", (
             f"engagement {index} was refused by the contract but cleared by the firm")
-    on_chain = {row["id"] for row in live.get("/v1/firm/agreements").json()["agreements"]}
+    on_chain = {row["id"] for row in live.get(
+        "/v1/firm/agreements", headers=live_headers).json()["agreements"]}
     assert set(attested) <= on_chain, "an agreement the review says it attested is not on the chain"
 
 
 def test_the_agreements_are_readable_off_the_chain(live, live_headers):
     live.post("/v1/firm/review", json={"engagement": 0}, headers=live_headers)
-    answer = live.get("/v1/firm/agreements").json()
+    answer = live.get("/v1/firm/agreements", headers=live_headers).json()
     assert answer["chain"]["on_chain"] is True
     assert answer["agreements"], "a review that wrote agreements must be able to show them"
     assert all(row["state"] for row in answer["agreements"])
@@ -336,7 +340,8 @@ def test_the_transcript_is_this_world_s_only(live, live_headers):
     theirs = live.get("/v1/firm/transcript", headers=by_device(OTHER_DEVICE)).json()
     assert theirs["messages"] == [], "another device read this world's mirror rows"
     # The chain, though, is shared truth: the agreements are the same either way.
-    assert len(live.get("/v1/firm/agreements").json()["agreements"]) >= len(mine["messages"]) // 3
+    assert len(live.get("/v1/firm/agreements", headers=live_headers).json()["agreements"]) \
+        >= len(mine["messages"]) // 3
 
 
 def test_a_role_can_read_what_it_was_told(live, live_headers):
@@ -350,6 +355,66 @@ def test_a_role_can_read_what_it_was_told(live, live_headers):
     assert answer["cursor"] >= 1
     later = live.get("/v1/firm/inbox", params={"role": to_role, "after": answer["cursor"]}).json()
     assert later["messages"] == [], "the cursor replayed mail the role had already read"
+
+
+def test_shared_agreements_require_a_world_credential(live):
+    assert live.get("/v1/firm/agreements").status_code == 401
+    device_view = live.get("/v1/firm/agreements", headers=by_device(DEVICE))
+    assert device_view.status_code == 200
+    assert all(set(row) == {"id", "from_role", "to_role", "state"}
+               for row in device_view.json()["agreements"])
+    assert live.get("/v1/firm/agreements",
+                    headers={"Authorization": "Bearer not-a-valid-token"}).status_code == 401
+
+
+def test_shared_agreements_redact_financial_terms(live, live_headers):
+    live.post("/v1/firm/review", json={"engagement": 0}, headers=live_headers)
+    answer = live.get("/v1/firm/agreements", headers=live_headers)
+    assert answer.status_code == 200
+    body = answer.json()
+    assert body["agreements"]
+    assert all(set(row) == {"id", "from_role", "to_role", "state"} for row in body["agreements"])
+    assert all(set(row) == {"agreement", "from_role", "to_role"} for row in body["waiting_on_humans"])
+    serialized = json.dumps(body)
+    assert all(f'"{field}"' not in serialized
+               for field in ("amountCents", "nonAuditCents", "amount_cents",
+                             "termsHash", "evidenceHash", "terms_hash", "evidence_hash"))
+
+
+def test_sidecar_fails_closed_for_unauthenticated_or_browser_requests(sidecar):
+    def request(method, path, body=None, headers=None):
+        data = None if body is None else json.dumps(body).encode()
+        req = urllib.request.Request(sidecar.url + path, data=data, method=method, headers=headers or {})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as response:
+                return response.status, json.loads(response.read().decode())
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read().decode())
+
+    assert request("POST", "/", {"op": "advance"},
+                   {"Content-Type": "application/json"})[0] == 401
+    assert request("GET", "/status")[0] == 401
+    assert request("GET", "/status", headers={
+        "x-twin-chain-token": "incorrect-token-with-sufficient-length-000",
+    })[0] == 401
+    assert request("GET", "/status", headers={"Origin": "http://127.0.0.1"})[0] == 403
+    assert request("GET", "/status", headers={
+        "Host": "attacker.example", "x-twin-chain-token": sidecar.token,
+    })[0] == 403
+    assert request("POST", "/", {"op": "advance"}, {
+        "Content-Type": "text/plain", "x-twin-chain-token": sidecar.token,
+    })[0] == 415
+    code, body = request("POST", "/", {"op": "countersign"}, {
+        "Content-Type": "application/json", "x-twin-chain-token": sidecar.token,
+    })
+    assert code == 400 and "unknown op" in body["error"]
+
+
+def test_sidecar_refuses_to_start_without_a_strong_token(tmp_path):
+    with pytest.raises(ChainDown, match="TWIN_CHAIN_TOKEN"):
+        with spawn_sidecar(journal=tmp_path / "weak-token.jsonl",
+                           extra_env={"TWIN_CHAIN_TOKEN": ""}, wait_sec=10):
+            pytest.fail("sidecar started without a token")
 
 
 def _json(value):

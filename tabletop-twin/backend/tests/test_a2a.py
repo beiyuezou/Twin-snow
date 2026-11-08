@@ -114,7 +114,7 @@ def test_an_agent_the_chain_never_funded_is_not_heard_at_all(bus, store):
     assert list(store.read_log(USER)) == []
 
 
-def test_the_human_hold_is_a_queue_and_it_drains(bus, store):
+def test_the_human_hold_stays_queued_without_a_real_signing_key(bus, store):
     opened = bus.send("propose", **{
         "from_role": "engagement-partner", "to_role": "quality-review-partner",
         "subject": "quality management review", "terms": "review the file before the opinion is signed",
@@ -135,24 +135,18 @@ def test_the_human_hold_is_a_queue_and_it_drains(bus, store):
     # The one move that cannot be made from here: the reviewer's own agent key closes the file.
     held = bus.send("settle", from_role="quality-review-partner", agreement=agreement)
     assert not held.ok and held.refusal.name == "HumanRequired"
-    impostor = bus.send("countersign", from_role="engagement-partner", agreement=agreement)
-    assert not impostor.ok and impostor.refusal.name == "HumanRequired"
-
-    signed = bus.send("countersign", from_role="quality-review-partner", agreement=agreement)
-    assert signed.ok, signed.refusal
-    settled = bus.send("settle", from_role="quality-review-partner", agreement=agreement)
-    assert settled.ok and settled.state == "Settled"
-    assert bus.waiting_on_humans() == [], "the queue drains by signing, not by waiting"
+    with pytest.raises(ValueError, match="not something an agent can say"):
+        bus.send("countersign", from_role="quality-review-partner", agreement=agreement)
+    assert [row["agreement"] for row in bus.waiting_on_humans()] == [agreement]
 
     rows = [row for row in store.agent_messages(USER, limit=80) if row["agreement"] == agreement]
-    assert len(rows) == 8, "every attempt is a row, including the three that were held"
+    assert len(rows) == 5, "attempts that cannot be made by an agent are not chain traffic"
     assert {(row["verb"], row["state"]) for row in rows} == {
         ("propose", "Proposed"), ("accept", "Accepted"), ("attest", "Attested"),
-        ("countersign", "Attested"), ("settle", "Settled"), ("settle", "refused"),
-        ("countersign", "refused"),
+        ("settle", "refused"),
     }
     assert sorted(row["refusal"].split("(")[0] for row in rows if row["refusal"]) == [
-        "HumanRequired", "HumanRequired", "WrongState",
+        "HumanRequired", "WrongState",
     ]
 
 
@@ -207,7 +201,7 @@ def test_an_inbox_names_the_roles_and_a_cursor_advances(bus, chain):
     items, cursor = bus.receive("quality-review-partner")
     assert items, "the reviewer has an inbox"
     assert all("quality-review-partner" in item["roles"] for item in items)
-    assert {item["name"] for item in items} >= {"Registered", "Proposed", "Accepted", "Countersigned", "Settled"}
+    assert {item["name"] for item in items} >= {"Registered", "Proposed", "Accepted"}
     assert cursor >= max(item["seq"] for item in items)
     again, _ = bus.receive("quality-review-partner", after=cursor)
     assert again == [], "a cursor that rereads everything is not a cursor"
@@ -228,4 +222,4 @@ def test_a_dead_chain_records_nothing(store):
 def test_only_the_verbs_the_contract_understands_are_ours(bus):
     with pytest.raises(ValueError):
         bus.send("invoice", from_role="engagement-partner", agreement="0x" + "00" * 32)
-    assert set(STATES) == {"propose", "accept", "attest", "countersign", "settle", "reject", "dispute"}
+    assert set(STATES) == {"propose", "accept", "attest", "settle", "reject", "dispute"}

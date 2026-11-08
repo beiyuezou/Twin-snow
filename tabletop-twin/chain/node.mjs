@@ -6,15 +6,14 @@
 // talked around by the agent that finds it inconvenient, which is the only sense in which a
 // firm run by agents can be read by somebody who is not one.
 //
-// Keys are derived from names, so they are not secrets: the firm's agents, their human
-// principals and the firm key all rebuild from the journal after a crash. That is the trade
-// being made on purpose. The chain is a durable, checkable record of who agreed to what, not
-// a custody system. The keys that do carry weight are the humans', and `countersign()` only
-// accepts the address the registry holds for a role, so a machine cannot invent the signature
-// that makes an opinion signable.
+// Keys are derived from names, so they are simulation identities, not secrets. In
+// particular, a principal key here is not a human signature. The contract still enforces
+// its signature gate, but this process must never expose an operation that uses that
+// deterministic key to claim a human approved an agreement.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { createVM, runTx } from '@ethereumjs/vm';
 import { createLegacyTx } from '@ethereumjs/tx';
 import { Account, bytesToHex, createAddressFromPrivateKey, createAddressFromString, hexToBytes } from '@ethereumjs/util';
@@ -22,7 +21,7 @@ import { createBlock } from '@ethereumjs/block';
 import { AbiCoder, Interface, keccak256, toUtf8Bytes } from 'ethers';
 
 const require = createRequire(import.meta.url);
-const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1'));
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 export const GENESIS_AT = 1_735_689_600; // 2025-01-01T00:00:00Z, fixed so a replay matches
 export const START_BALANCE = 10n ** 20n; // 100 ETH minted locally, so gas is paid for real
@@ -265,6 +264,9 @@ export class TwinChain {
   /// The clock moves one second per transaction so a deadline means the same thing on
   /// replay that it meant the first time.
   async write({ contract = 'EngagementAgreement', actor, fn, args }) {
+    if (contract === 'EngagementAgreement' && fn === 'countersign') {
+      throw new Error('human countersignatures are not available in the local simulation');
+    }
     this.tick += 1;
     const iface = this._interfaces[contract];
     const target = contract === 'AgentRegistry' ? this.registryAddress : this.agreementAddress;
@@ -391,14 +393,6 @@ export class TwinChain {
     const hash = evidence.startsWith('0x') && evidence.length === 66 ? evidence : sha3(evidence);
     const sent = await this.write({ actor: byRole, fn: 'attest', args: [id, sha3(byRole), hash] });
     return { ...sent, evidence_hash: hash };
-  }
-
-  /// Sent by the human key the registry holds for the counterparty role, never by the agent.
-  /// That is the whole of the difference between a record and a signature.
-  async countersign({ id, role }) {
-    const agent = this.roster.agents.find((a) => a.role === role);
-    if (!agent) throw new Error(`no principal on file for ${role}`);
-    return await this.write({ actor: agent.principal, fn: 'countersign', args: [id] });
   }
 
   async settle({ id, byRole }) {

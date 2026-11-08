@@ -22,6 +22,7 @@ import contextlib
 import http.client
 import json
 import os
+import secrets
 import shutil
 import socket
 import subprocess
@@ -237,6 +238,8 @@ def spawn_sidecar(
         raise ChainDown(f"no sidecar at {SERVE}")
     port = port or _free_port()
     env = {**os.environ, "TWIN_CHAIN_PORT": str(port)}
+    token = secrets.token_urlsafe(32)
+    env["TWIN_CHAIN_TOKEN"] = token
     if journal:
         env["TWIN_CHAIN_JOURNAL"] = str(journal)
     if cap_source:
@@ -246,7 +249,7 @@ def spawn_sidecar(
     process = subprocess.Popen(  # noqa: S603 - the command is this repository's own script
         [node, str(SERVE)], cwd=str(SERVE.parent), env=env, stdout=log, stderr=subprocess.STDOUT, text=True
     )
-    chain = Chain(url=f"http://127.0.0.1:{port}", timeout_sec=30.0)
+    chain = Chain(url=f"http://127.0.0.1:{port}", token=env["TWIN_CHAIN_TOKEN"], timeout_sec=30.0)
     deadline = time.time() + wait_sec
     try:
         while time.time() < deadline:

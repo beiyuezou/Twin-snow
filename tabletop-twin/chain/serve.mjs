@@ -1,15 +1,13 @@
 // Serves the agent chain to the Python backend over 127.0.0.1.
 //
-// The backend cannot run an EVM, so this process holds the one real instance of it and the
-// backend talks to it the way it would talk to any other local service. Nothing here is
-// reachable from outside the machine, and the keys it signs with are derived from role names
-// rather than kept secret, so the sidecar is a bridge, not a vault. If TWIN_CHAIN_TOKEN is
-// set, writes additionally require it in x-twin-chain-token - which matters the moment
-// somebody points this at a non-loopback interface.
+// The backend cannot run an EVM, so this process holds the local simulation. Its deterministic
+// keys are not human credentials. A strong shared token is mandatory for writes, browser-origin
+// requests are rejected, and human countersigning is deliberately unavailable.
 //
 // Writes are queued, not overlapped: two transactions signed from the same account at the
 // same nonce would be the same transaction twice, and a queue is cheaper than explaining it.
 import http from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +19,9 @@ const HOST = '127.0.0.1';
 // A test wants a chain of its own; the app wants the one it can find again tomorrow.
 const JOURNAL = process.env.TWIN_CHAIN_JOURNAL || path.join(here, '.journal.jsonl');
 const TOKEN = process.env.TWIN_CHAIN_TOKEN || '';
+if (Buffer.byteLength(TOKEN) < 32) {
+  throw new Error('TWIN_CHAIN_TOKEN must be configured with at least 32 bytes');
+}
 
 function readCap() {
   const file = process.env.TWIN_PRIORS || path.join(here, '..', 'backend', 'twin', 'audit', 'data', 'priors.json');
@@ -54,7 +55,6 @@ const OPS = {
   propose: (b) => chain.propose(b),
   accept: (b) => chain.accept(b),
   attest: (b) => chain.attest(b),
-  countersign: (b) => chain.countersign(b),
   settle: (b) => chain.settle(b),
   reject: (b) => chain.reject(b),
   dispute: (b) => chain.dispute(b),
@@ -70,6 +70,15 @@ function send(res, code, body) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   const respond = async () => {
+    if (req.headers.origin || req.headers.host !== `${HOST}:${PORT}`) {
+      return send(res, 403, { error: 'request origin or host is not allowed' });
+    }
+    const suppliedToken = req.headers['x-twin-chain-token'];
+    const expected = Buffer.from(TOKEN);
+    const supplied = Buffer.from(typeof suppliedToken === 'string' ? suppliedToken : '');
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+      return send(res, 401, { error: 'bad token' });
+    }
     if (req.method === 'GET') {
       if (url.pathname === '/status') return send(res, 200, { ...(await chain.status()), cap_percent: cap.percent, source: `${cap.celex} art ${cap.article}` });
       if (url.pathname === '/agreements') return send(res, 200, { agreements: await chain.agreements() });
@@ -95,7 +104,9 @@ const server = http.createServer((req, res) => {
       return send(res, 404, { error: `no route ${url.pathname}` });
     }
     if (req.method !== 'POST') return send(res, 405, { error: 'GET or POST' });
-    if (TOKEN && req.headers['x-twin-chain-token'] !== TOKEN) return send(res, 401, { error: 'bad token' });
+    if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) {
+      return send(res, 415, { error: 'content-type must be application/json' });
+    }
     const body = await new Promise((resolve, reject) => {
       let raw = '';
       req.on('data', (chunk) => {

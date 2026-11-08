@@ -270,8 +270,14 @@ the service draws nothing), and `TWIN_RECONCILE_SEC` — off by default — turn
 background sweep of payments that are still waiting for an answer.
 
 The contract is off by default in the same way. `TWIN_CHAIN_URL` names the sidecar the
-firm writes its agreements to, and `TWIN_CHAIN_TOKEN` is what the sidecar expects on
-those calls; with neither set the service never asks for a chain, and the firm's card
+firm writes its agreements to, and `TWIN_CHAIN_TOKEN` is a required, randomly generated
+secret of at least 32 bytes shared with the sidecar. The sidecar refuses to start without
+it, authenticates every request, rejects browser-origin requests and non-JSON writes, and
+only accepts the loopback host it binds to. The local EVM derives principal keys from
+public role names, so they are not human credentials: its API deliberately has no
+countersign operation, and agreements remain held for an actual human signature. The
+shared agreement list requires a known device or account credential and omits fee amounts
+and evidence hashes. With no `TWIN_CHAIN_URL` the service never asks for a chain, and the firm's card
 says *no contract* and gives the reason instead of showing an empty list where agreements
 would have been. The sidecar reads `TWIN_CHAIN_PORT` (8791), `TWIN_CHAIN_JOURNAL` and
 `TWIN_PRIORS`, the last of which points it at the same derived thresholds the firm quotes,
