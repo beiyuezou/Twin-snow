@@ -856,9 +856,18 @@ def firm_review(body: EngagementIn, user_id: str = Depends(current_user),
 
 
 @app.get("/v1/firm/agreements")
-def firm_agreements() -> dict:
-    """What the contract holds, and which of it is waiting on a human signature."""
-    return firm_service.service().agreements()
+def firm_agreements(_user_id: str = Depends(current_user)) -> dict:
+    """Shared chain status for a known world, without engagement financial terms."""
+    result = firm_service.service().agreements()
+    result["agreements"] = [
+        {key: row.get(key) for key in ("id", "from_role", "to_role", "state")}
+        for row in result["agreements"]
+    ]
+    result["waiting_on_humans"] = [
+        {key: row.get(key) for key in ("agreement", "from_role", "to_role")}
+        for row in result["waiting_on_humans"]
+    ]
+    return result
 
 
 @app.get("/v1/firm/transcript")

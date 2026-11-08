@@ -28,13 +28,12 @@ from typing import Any
 
 from twin.audit.chain import Chain, Receipt, Refusal
 
-# One verb, one state it is supposed to produce. `countersign` changes who has signed rather
-# than what state the agreement is in, so it reaches for the state it was already in.
+# Only agent actions are available here. Human signatures require a separately controlled key
+# and must never be simulated by this process's deterministic role keys.
 STATES = {
     "propose": "Proposed",
     "accept": "Accepted",
     "attest": "Attested",
-    "countersign": "Attested",
     "settle": "Settled",
     "reject": "Rejected",
     "dispute": "Disputed",
@@ -55,8 +54,6 @@ def _payload(verb: str, agreement: str, by_role: str, fields: dict[str, Any]) ->
             "non_audit_cents": int(fields.get("non_audit_cents") or 0),
             "horizon_sec": int(fields.get("horizon_sec") or 3600),
         }
-    if verb == "countersign":
-        return {"id": agreement, "role": by_role}
     body: dict[str, Any] = {"id": agreement, "by_role": by_role}
     for name in ("evidence", "reason"):
         if fields.get(name):

@@ -119,6 +119,14 @@ other; they cannot sign on behalf of a human, because there is no human key in t
 deployment. Agreements therefore reach **Attested** and wait, and the count of them waiting
 is shown as a state the table is in rather than a step that failed.
 
+The local EVM derives its principal keys from public role names; those keys are simulation
+identities and must never be treated as human approval. The sidecar therefore has no
+countersign operation, and the local chain client rejects attempts to use one. The shared
+agreement-list API requires a known device or account credential and reveals only ids, role
+names and states, not financial terms or evidence hashes. The sidecar also fails closed without a 32-byte
+`TWIN_CHAIN_TOKEN`, authenticates all requests, and rejects browser-origin, unexpected-host
+and non-JSON write requests.
+
 ## Agent to agent
 
 Between the roles, messages go over the same contract bus, and a refused write is still

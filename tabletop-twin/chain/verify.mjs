@@ -123,29 +123,23 @@ await passage('the named counterparty accepts', () => chain.accept({ id: live.id
 
 await refusal(chain, 'attest before the review exists', () =>
   chain.attest({ id: live.id, byRole: 'quality-review-partner', evidence: 'the reviewer signs off first' }), 'NotProposer');
-await refusal(chain, 'countersign before anything is attested', () =>
-  chain.countersign({ id: live.id, role: 'quality-review-partner' }), 'WrongState');
 await passage('the proposer attests the evidence hash', () =>
   chain.attest({ id: live.id, byRole: 'engagement-partner', evidence: 'audit file 2025, section 4, paragraph 12' }), 'Attested');
 
-await refusal(chain, 'an agent cannot countersign for its own human', () =>
-  chain.write({ actor: 'quality-review-partner', fn: 'countersign', args: [live.id] }), 'HumanRequired');
-await refusal(chain, "another role's human cannot countersign either", () =>
-  chain.write({ actor: 'human-engagement-partner', fn: 'countersign', args: [live.id] }), 'HumanRequired');
+let humanSigningUnavailable = false;
+try {
+  await chain.write({ actor: 'human-quality-review-partner', fn: 'countersign', args: [live.id] });
+} catch (error) {
+  humanSigningUnavailable = /not available in the local simulation/.test(error.message);
+}
+check('the local simulation cannot impersonate a human signature', humanSigningUnavailable,
+  'deterministic principal keys cannot countersign');
 await refusal(chain, 'settle while the human signature is missing', () =>
   chain.settle({ id: live.id, byRole: 'quality-review-partner' }), 'HumanRequired');
 
-// Negative control for the human gate: the same settle that was refused one line above goes
-// through once the registered principal has countersigned.
-const signedBy = await chain.countersign({ id: live.id, role: 'quality-review-partner' });
-check('the registered principal countersigns', signedBy.status === 1,
-  `signedBy ${(await chain.agreement(live.id)).signedBy?.slice(0, 14)}`);
-await passage('control: the refused settle now passes', () => chain.settle({ id: live.id, byRole: 'quality-review-partner' }), 'Settled');
-await refusal(chain, 'a settled agreement cannot be settled again', () =>
-  chain.settle({ id: live.id, byRole: 'quality-review-partner' }), 'WrongState');
-
-const settled = await chain.agreement(live.id);
-check('evidence hash survived settlement', settled.evidenceHash?.length === 66, `${settled.evidenceHash?.slice(0, 18)}...`);
+const held = await chain.agreement(live.id);
+check('the attested agreement stays held for a real human', held.state === 'Attested' && held.evidenceHash?.length === 66,
+  `${held.state}, evidence ${held.evidenceHash?.slice(0, 18)}...`);
 
 // --- refusals are kept, not deleted ---------------------------------------------
 const doomed = await chain.propose({ from: 'fraud-risk-assessor', to: 'engagement-partner',

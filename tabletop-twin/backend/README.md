@@ -187,6 +187,19 @@ authority over this fact rather than guessing at one. A finding binds only when 
 the role that has to act. Everything the endpoints return is a count of rows or a fold of
 them; the client is not given figures to interpret.
 
+The chain is shared across accounts, so its agreement-list endpoint requires a known
+device or account credential and returns only agreement ids, roles and states; it never
+returns engagement amounts or terms/evidence hashes. Requests without either credential
+are rejected.
+
+The local EVM derives signing keys from public role names, including the names configured
+as principals. These are simulation keys, not human credentials. The sidecar requires a
+shared `TWIN_CHAIN_TOKEN` of at least 32 bytes, authenticates every request, refuses
+browser-origin or unexpected-host requests, and accepts only JSON writes. Its API and the agent message bus do not expose
+`countersign`, and the local chain layer rejects that operation, so agreements cannot be
+marked human-approved by a deterministic key. They remain attested and held until a real
+human-signing integration is added.
+
 The verdict is the model's, when a model is configured, and the service will not file an
 answer it cannot check. The harvested articles are indexed for exactly that: every one has
 an id, is searchable by a role's question, and is stored with the digest of its own text, so
